@@ -36,21 +36,3 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T | ((p: T) 
   const set = useCallback((v: T | ((p: T) => T)) => setValue(v), []);
   return [value, set];
 }
-
-export interface Favorite {
-  hangul: string;
-  hanja: string;
-  total: number;
-  grade: string;
-  /** 리포트 링크용 인코딩 상태 */
-  query: string;
-}
-
-export function useFavorites() {
-  const [list, setList] = useStoredState<Favorite[]>('favorites', []);
-  const has = (hanja: string) => list.some((f) => f.hanja === hanja);
-  const toggle = (f: Favorite) =>
-    setList((prev) => (prev.some((x) => x.hanja === f.hanja) ? prev.filter((x) => x.hanja !== f.hanja) : [f, ...prev]));
-  const remove = (hanja: string) => setList((prev) => prev.filter((x) => x.hanja !== hanja));
-  return { list, has, toggle, remove, clear: () => setList([]) };
-}

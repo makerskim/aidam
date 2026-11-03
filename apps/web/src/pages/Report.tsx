@@ -4,7 +4,7 @@ import type { NameReport, Recommendation, SajuResult } from '@aidam/engine';
 import { call, errorMessage } from '../lib/engine';
 import { fromSearch, toQuery, type AnalyzeState } from '../lib/state';
 import { ReportView } from '../components/report';
-import { Disclaimer, ErrorText, Loading } from '../components/ui';
+import { Disclaimer, ErrorText, Staged } from '../components/ui';
 
 export function Report() {
   const { search } = useLocation();
@@ -38,13 +38,14 @@ export function Report() {
   return (
     <main className="stack-lg">
       {error ? <ErrorText>{error}</ErrorText> : null}
-      {!data && !error ? <Loading text="이름을 풀고 있어요" /> : null}
-      {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} /> : null}
-      <div className="row">
-        <Link className="btn btn-line" to={`/self?${toQuery(state)}`}>
-          한자 바꿔 보기
-        </Link>
-      </div>
+      {!error ? (
+        <Staged steps={['사주를 세우고 있어요', '한자의 뜻과 기운을 살피고 있어요', '획수와 소리를 따져 보고 있어요']} done={Boolean(data)}>
+          {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} /> : null}
+        </Staged>
+      ) : null}
+      <Link className="btn btn-secondary btn-block" to={`/self?${toQuery(state)}`}>
+        한자 바꿔 보기
+      </Link>
       <Disclaimer />
     </main>
   );

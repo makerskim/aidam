@@ -59,3 +59,12 @@ describe('세트 중복', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
+
+describe('세트 다양성', () => {
+  it('한글 이름 조합이 같은 세트(한자만 다름)는 한 번만 보여 준다', () => {
+    const kids = [0, 1].map((i) => ({ label: String(i), gender: 'female' as const, birth: birth(10, 5 + i * 4) }));
+    const r = recommendSiblingSets(surname, kids, DEFAULT_PREFERENCES, DEFAULT_SAJU_OPTIONS, DEFAULT_SCHOOL_OPTIONS, 10);
+    const keys = r.map((s) => s.names.map((n) => n.hangul).sort().join('|'));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

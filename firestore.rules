@@ -1,0 +1,12 @@
+rules_version = '2';
+// 아이담: 각 사용자는 자기 이름함(users/{uid}/names)만 읽고 쓸 수 있다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/names/{id} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['id', 'hangul', 'hanja', 'total', 'grade', 'query', 'savedAt', 'bookmarked'])
+        && request.resource.data.query is string && request.resource.data.query.size() < 4000;
+    }
+  }
+}

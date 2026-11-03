@@ -1,4 +1,4 @@
-import type { BirthInput, Gender, NameChar, Preferences, SajuOptions, SchoolOptions, ChildInput } from '@aidam/engine';
+import type { BirthInput, Gender, NameChar, Preferences, SajuOptions, SchoolOptions } from '@aidam/engine';
 import { encodeState, decodeState } from '@aidam/engine/src/share/state';
 
 export const STATE_VERSION = 1;
@@ -15,11 +15,27 @@ interface Common {
   sajuOpts: SajuOptions;
 }
 
-/** 작명(추천) 입력 */
+/** 다둥이 아이별 입력 (생일·출생지는 함께 쓰고 성별·시각만 다름) */
+export interface KidInput {
+  gender: Gender;
+  time: { hour: number; minute: number } | null;
+}
+
+/** 작명(추천) 입력. kids가 2명 이상이면 다둥이 세트로 짓는다 */
 export interface NameState extends Common {
   gender: Gender;
   birth: BirthInput | null;
   prefs: Preferences;
+  kids?: KidInput[];
+}
+
+export const KID_LABELS = ['첫째', '둘째', '셋째', '넷째'];
+
+/** 다둥이 각자의 출생 정보 */
+export function kidBirth(state: NameState, i: number): BirthInput | null {
+  const k = state.kids?.[i];
+  if (!state.birth) return null;
+  return k ? { ...state.birth, time: k.time } : state.birth;
 }
 
 /** 특정 이름 분석(리포트·셀프 분석) 입력 */
@@ -29,12 +45,6 @@ export interface AnalyzeState extends Common {
   given: NameChar[];
 }
 
-/** 다둥이 입력 */
-export interface SiblingState extends Common {
-  children: ChildInput[];
-  prefs: Preferences;
-  mode: 'recommend' | 'analyze';
-}
 
 export const DEFAULT_SCHOOL: SchoolOptions = {
   soundSchool: 'haerye',

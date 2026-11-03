@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@aidam/engine": "workspace:*",
-    "@fontsource/gowun-batang": "5.1.0",
-    "@fontsource/gowun-dodum": "5.1.0",
+    "firebase": "12.19.0",
+    "pretendard": "1.3.9",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "7.18.5"

@@ -4,7 +4,6 @@
  */
 import {
   analyzeName,
-  analyzeSiblings,
   computeSaju,
   DATA_VERSION,
   ENGINE_VERSION,
@@ -19,8 +18,8 @@ import {
   type SajuOptions,
 } from '@aidam/engine';
 import { FAMILIAR_HANJA } from '@aidam/engine/src/recommend/syllables';
-import type { AnalyzeState, NameState, SiblingState } from './state';
-import { surnameChars } from './state';
+import type { AnalyzeState, NameState } from './state';
+import { KID_LABELS, surnameChars } from './state';
 
 export interface HanjaOption {
   ch: string;
@@ -54,6 +53,18 @@ export const api = {
     });
     return { saju, recs };
   },
+  /** 다둥이: 아이마다 사주를 세우고 이름 세트를 추천 */
+  recommendKids(state: NameState) {
+    const kids = state.kids ?? [];
+    const children = kids.map((k, i) => ({
+      label: KID_LABELS[i] ?? `${i + 1}`,
+      gender: k.gender,
+      birth: state.birth ? { ...state.birth, time: k.time } : null,
+    }));
+    const sajus = children.map((c) => (c.birth ? computeSaju(c.birth, state.sajuOpts) : null));
+    const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 10);
+    return { sajus, sets };
+  },
   analyze(state: AnalyzeState) {
     const saju = state.birth ? computeSaju(state.birth, state.sajuOpts) : null;
     const input = { surname: surnameChars(state.surname), given: state.given, gender: state.gender };
@@ -80,13 +91,6 @@ export const api = {
     const rank = (o: HanjaOption) =>
       (o.nameUse ? 4 : 0) + (o.familiar ? 2 : 0) + (o.meaning ? 1 : 0) - (o.negative ? 5 : 0) + (o.favor ?? 0) * 0.5;
     return list.sort((a, b) => rank(b) - rank(a) || (a.ch.codePointAt(0) ?? 0) - (b.ch.codePointAt(0) ?? 0));
-  },
-  siblings(state: SiblingState) {
-    const surname = surnameChars(state.surname);
-    if (state.mode === 'analyze') {
-      return { kind: 'analyze' as const, result: analyzeSiblings(surname, state.children, state.sajuOpts, state.school) };
-    }
-    return { kind: 'recommend' as const, result: recommendSiblingSets(surname, state.children, state.prefs, state.sajuOpts, state.school, 10) };
   },
 };
 

@@ -225,7 +225,7 @@ export function recommendSiblingSets(
         pairN++;
       }
       const indiv = names.reduce((s, n) => s + n.report.score.total, 0) / names.length;
-      results.push({ idx: [...idx], score: round1(0.6 * indiv + 0.4 * (pairSum / pairN)), key: names.map((n) => n.hanja).join('|'), set: names.map((n) => n.hanja).sort().join('|') });
+      results.push({ idx: [...idx], score: round1(0.6 * indiv + 0.4 * (pairSum / pairN)), key: names.map((n) => n.hanja).join('|'), set: names.map((n) => n.hangul).sort().join('|') });
       return;
     }
     const list = candidates[k] as Recommendation[];
@@ -242,12 +242,12 @@ export function recommendSiblingSets(
   const seenSets = new Set<string>();
   const out: SiblingSet[] = [];
   for (const r of results) {
-    // 같은 이름 조합을 순서만 바꾼 세트는 점수가 높은 배치 하나만
+    // 같은 한글 이름 조합(순서·한자만 다른 세트)은 점수가 가장 높은 것 하나만
     if (seenSets.has(r.set)) continue;
     seenSets.add(r.set);
     const names = r.idx.map((ci, i) => (candidates[i] as Recommendation[])[ci] as Recommendation);
-    if (names.some((n, i) => !children[i]?.given?.length && (used.get(n.hanja) ?? 0) >= 3)) continue;
-    for (const n of names) used.set(n.hanja, (used.get(n.hanja) ?? 0) + 1);
+    if (names.some((n, i) => !children[i]?.given?.length && (used.get(n.hangul) ?? 0) >= 3)) continue;
+    for (const n of names) used.set(n.hangul, (used.get(n.hangul) ?? 0) + 1);
     const pairs: PairHarmony[] = [];
     for (let i = 0; i < r.idx.length; i++) for (let j = i + 1; j < r.idx.length; j++) pairs.push(pairOf(i, r.idx[i] as number, j, r.idx[j] as number));
     out.push({ names, pairs, score: r.score });
