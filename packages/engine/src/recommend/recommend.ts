@@ -224,3 +224,42 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
 }
 
 export type { Element };
+
+/**
+ * 셀프 분석용: 같은 소리를 유지하면서 점수가 더 높은 한자 조합을 최대 limit개 제안.
+ * 각 글자마다 후보 한자 상위 12개(친숙·좋은 뜻·용희신 순) 조합을 정식 분석으로 비교한다.
+ */
+export function suggestBetterHanja(
+  input: { surname: NameChar[]; given: NameChar[]; gender: Gender },
+  saju: SajuAnalysis | null,
+  options: SchoolOptions,
+  limit = 3,
+): Recommendation[] {
+  const current = analyzeName(input, saju, options);
+  const lists = input.given.map((g, i) => {
+    const list = hanjaCandidates(g.hangul, i, saju, options);
+    const cur = g.hanja ? getHanja(g.hanja) : undefined;
+    return cur && !list.includes(cur) ? [...list, cur] : list;
+  });
+  if (lists.some((l) => l.length === 0)) return [];
+  let combos: HanjaEntry[][] = [[]];
+  for (const l of lists) {
+    const next: HanjaEntry[][] = [];
+    for (const c of combos) for (const h of l) next.push([...c, h]);
+    combos = next;
+  }
+  const surHangul = input.surname.map((c) => c.hangul).join('');
+  const surHanja = input.surname.map((c) => c.hanja ?? '').join('');
+  const curHanja = input.given.map((g) => g.hanja ?? '').join('');
+  const out: Recommendation[] = [];
+  for (const entries of combos) {
+    const hanja = entries.map((h) => h.ch).join('');
+    if (hanja === curHanja) continue;
+    const given = input.given.map((g, i) => ({ hangul: g.hangul, hanja: (entries[i] as HanjaEntry).ch }));
+    const report = analyzeName({ ...input, given }, saju, options);
+    if (report.score.total <= current.score.total) continue;
+    out.push({ hangul: surHangul + given.map((g) => g.hangul).join(''), hanja: surHanja + hanja, report });
+  }
+  out.sort((a, b) => b.report.score.total - a.report.score.total || cmpCodePoints(a.hanja, b.hanja));
+  return out.slice(0, limit);
+}
