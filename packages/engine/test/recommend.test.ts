@@ -131,3 +131,21 @@ describe('외자 + 흉수 성씨', () => {
     expect(r[0]!.report.warnings.some((w) => w.includes('이격'))).toBe(true);
   });
 });
+
+describe('검토 보완', () => {
+  it('두 학설 모두 상극 없음 옵션: 해례본·운해본 어느 쪽에도 상극이 없다', () => {
+    const r = recommendNames({ ...base, options: { ...DEFAULT_SCHOOL_OPTIONS, bothSchoolsNoClash: true } });
+    expect(r.length).toBeGreaterThan(0);
+    for (const x of r) {
+      expect(x.report.soundBySchool.haerye.pairs.some((p) => p.kind === 'clash')).toBe(false);
+      expect(x.report.soundBySchool.unhae.pairs.some((p) => p.kind === 'clash')).toBe(false);
+    }
+  });
+  it('넣고 싶은 소리·피할 소리는 10개까지만 반영(조작된 링크로 계산 폭증 방지)', () => {
+    const many = Array.from({ length: 400 }, (_, i) => String.fromCodePoint(0xac00 + i * 7));
+    const include = ['서', '하', ...many];
+    const first10 = include.slice(0, 10);
+    const r = recommendNames({ ...base, prefs: { ...DEFAULT_PREFERENCES, style: 'unique', include }, limit: 60 });
+    for (const x of r) expect([...x.hangul.slice(1)].some((s) => first10.includes(s)), x.hangul).toBe(true);
+  });
+});

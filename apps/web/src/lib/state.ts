@@ -42,6 +42,7 @@ export const DEFAULT_SCHOOL: SchoolOptions = {
   femaleStrongNumbers: false,
   excludeBulyong: false,
   includeFinalConsonant: false,
+  bothSchoolsNoClash: false,
 };
 export const DEFAULT_SAJU: SajuOptions = { trueSolarTime: true, equationOfTime: false, ziHour: 'nextDay' };
 export const DEFAULT_PREFS: Preferences = { length: 2, style: 'balanced' };

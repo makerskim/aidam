@@ -35,6 +35,8 @@ export interface SchoolOptions {
   excludeBulyong: boolean;
   /** 받침 오행까지 음령오행에 포함 */
   includeFinalConsonant: boolean;
+  /** 해례본·운해본 두 학설 모두에서 음령오행 상극이 없는 이름만 추천 */
+  bothSchoolsNoClash?: boolean;
 }
 
 export const DEFAULT_SCHOOL_OPTIONS: SchoolOptions = {

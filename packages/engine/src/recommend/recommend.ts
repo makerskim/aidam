@@ -126,9 +126,11 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   if (surEntries.some((h) => !h)) throw new RangeError('UNKNOWN_SURNAME_HANJA');
   const surStrokes = (surEntries as HanjaEntry[]).reduce((s, h) => s + h.strokes, 0);
 
-  const exclude = new Set(prefs.exclude ?? []);
-  const excludeInitials = new Set(prefs.excludeInitials ?? []);
-  const include = prefs.include?.filter(Boolean) ?? [];
+  // 조작된 링크로 계산량이 폭증하지 않도록 목록 길이를 제한한다
+  const MAX_LIST = 10;
+  const exclude = new Set((prefs.exclude ?? []).slice(0, MAX_LIST));
+  const excludeInitials = new Set((prefs.excludeInitials ?? []).slice(0, MAX_LIST));
+  const include = (prefs.include?.filter(Boolean) ?? []).slice(0, MAX_LIST);
 
   const pools: Pool[] =
     prefs.length === 1 ? [pool('single', gender)] : [pool('first', gender), pool('second', gender)];
@@ -158,6 +160,11 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     if (teaseWord(all.join(''))) continue;
     const flow = soundFlow(all, options.soundSchool, options.includeFinalConsonant);
     if (options.strictMode && flow.pairs.some((p) => p.kind === 'clash')) continue;
+    if (options.bothSchoolsNoClash) {
+      const other = options.soundSchool === 'haerye' ? 'unhae' : 'haerye';
+      if (flow.pairs.some((p) => p.kind === 'clash')) continue;
+      if (soundFlow(all, other, options.includeFinalConsonant).pairs.some((p) => p.kind === 'clash')) continue;
+    }
     const vowel = vowelYinYang(all);
     const pronChanged = pronounce(all).join('') !== all.join('');
     const practicalSound = 4 - (pronChanged ? 2 : 0);

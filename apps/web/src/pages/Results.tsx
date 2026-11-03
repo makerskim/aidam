@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import type { Recommendation, SajuResult } from '@aidam/engine';
 import { ELEMENT_HANJA, ELEMENT_KO } from '@aidam/engine/src/core/elements';
 import { SCHOOL_KO } from '@aidam/engine/src/name/sound';
+import { decompose } from '@aidam/engine/src/hangul/jamo';
 import { call, errorMessage } from '../lib/engine';
 import { fromSearch, STATE_VERSION, toQuery, type AnalyzeState, type NameState } from '../lib/state';
 import { useFavorites } from '../lib/storage';
@@ -32,6 +33,9 @@ export function Results() {
   const [sort, setSort] = useState<'score' | 'name'>('score');
   const [minGrade, setMinGrade] = useState<'all' | 'A' | 'S'>('all');
   const [shown, setShown] = useState(PAGE);
+  const [initial, setInitial] = useState('');
+  const surnameLen = state ? [...state.surname.hangul].length : 1;
+  const initialOf = (r: Recommendation) => decompose([...r.hangul][surnameLen] ?? '')?.initial ?? '';
   const fav = useFavorites();
 
   useEffect(() => {
@@ -58,8 +62,10 @@ export function Results() {
     );
   }
 
+  const initials = [...new Set((data?.recs ?? []).map(initialOf))].filter(Boolean).sort();
   const list = (data?.recs ?? [])
     .filter((r) => (minGrade === 'all' ? true : minGrade === 'S' ? r.report.score.grade === 'S' : ['S', 'A'].includes(r.report.score.grade)))
+    .filter((r) => !initial || initialOf(r) === initial)
     .sort((a, b) => (sort === 'score' ? 0 : a.hangul < b.hangul ? -1 : a.hangul > b.hangul ? 1 : 0));
   const a = data?.saju?.primary;
 
@@ -123,6 +129,18 @@ export function Results() {
               onChange={setMinGrade}
             />
           </div>
+          {initials.length > 1 ? (
+            <div className="choice-list" role="group" aria-label="이름 첫소리">
+              <button type="button" className="choice" aria-pressed={initial === ''} onClick={() => setInitial('')}>
+                모든 첫소리
+              </button>
+              {initials.map((c) => (
+                <button key={c} type="button" className="choice" aria-pressed={initial === c} onClick={() => { setInitial(c); setShown(PAGE); }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {list.length === 0 ? (
             <Notice>
               조건에 맞는 이름이 없어요. 피하고 싶은 소리를 줄이거나, 학설·계산 옵션에서 &lsquo;엄격하게 고르기&rsquo;를 꺼 보세요.

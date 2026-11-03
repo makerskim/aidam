@@ -257,6 +257,12 @@ export function SchoolOptionsPanel({
       </Field>
       <div>
         <Toggle checked={school.strictMode} onChange={(v) => onSchool({ ...school, strictMode: v })} title="엄격하게 고르기" desc="4격에 흉수가 있거나 소리오행이 상극인 이름은 빼요." />
+        <Toggle
+          checked={Boolean(school.bothSchoolsNoClash)}
+          onChange={(v) => onSchool({ ...school, bothSchoolsNoClash: v })}
+          title="두 학설 모두 상극 없게"
+          desc="해례본·운해본 어느 기준으로 봐도 소리오행이 부딪히지 않는 이름만 추천해요."
+        />
         <Toggle checked={school.femaleStrongNumbers} onChange={(v) => onSchool({ ...school, femaleStrongNumbers: v })} title="여아 강한 수 주의" desc="여아 이름에서 21·23·33·39를 낮게 보는 학설을 적용해요." />
         <Toggle checked={school.excludeBulyong} onChange={(v) => onSchool({ ...school, excludeBulyong: v })} title="불용한자 빼기" desc="일부 학설에서 이름에 쓰지 않는다고 보는 한자를 빼요." />
         <Toggle checked={school.includeFinalConsonant} onChange={(v) => onSchool({ ...school, includeFinalConsonant: v })} title="받침 소리까지 보기" desc="받침의 오행도 소리 흐름에 넣어요." />
