@@ -50,3 +50,12 @@ describe('다둥이', () => {
     for (const s of r) expect(s.names[0]!.hangul).toBe('김도윤');
   });
 });
+
+describe('세트 중복', () => {
+  it('같은 이름 조합을 순서만 바꾼 세트는 한 번만 보여 준다', () => {
+    const kids = [0, 1, 2].map((i) => ({ label: String(i), gender: 'female' as const, birth: birth(8, 10 + i) }));
+    const r = recommendSiblingSets(surname, kids, DEFAULT_PREFERENCES, DEFAULT_SAJU_OPTIONS, DEFAULT_SCHOOL_OPTIONS, 10);
+    const keys = r.map((s) => s.names.map((n) => n.hanja).sort().join('|'));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

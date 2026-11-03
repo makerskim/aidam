@@ -140,7 +140,9 @@ export function suriPointsFor(
       value = Math.min(value, 0.5);
       strongHits.push(key);
     }
-    if (info.luck === 'bad') noBad = false;
+    // 외자 이름의 이격은 성 획수만으로 정해져 이름으로 바꿀 수 없으므로 엄격 기준에서 뺀다
+    const fixedBySurname = strokes.length === 1 && key === 'i';
+    if (info.luck === 'bad' && !fixedBySurname) noBad = false;
     points += FRAME_WEIGHTS[key] * value;
     results.push({ key, n, info, value, element: suriElement(n) });
   }
@@ -235,6 +237,10 @@ export function analyzeName(
     frameResults.push(...s.results);
     for (const key of s.strongHits) {
       warnings.push(`${FRAME_KO[key].name} ${frames[key]}은(는) 여아에게 너무 강한 수로 보는 학설이 있어요.`);
+    }
+    const iFrame = s.results.find((f) => f.key === 'i');
+    if (input.given.length === 1 && iFrame && iFrame.info.luck === 'bad') {
+      warnings.push(`외자 이름은 이격이 성 획수(${iFrame.n})로만 정해져 이름으로 바꿀 수 없어요. 그래서 엄격 기준에서는 이격을 빼고 봤어요.`);
     }
     for (const f of s.results) {
       reasons.push({

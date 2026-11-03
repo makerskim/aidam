@@ -212,7 +212,7 @@ export function recommendSiblingSets(
     return p;
   };
 
-  const results: { idx: number[]; score: number; key: string }[] = [];
+  const results: { idx: number[]; score: number; key: string; set: string }[] = [];
   const idx: number[] = [];
   const walk = (k: number) => {
     if (k === children.length) {
@@ -225,7 +225,7 @@ export function recommendSiblingSets(
         pairN++;
       }
       const indiv = names.reduce((s, n) => s + n.report.score.total, 0) / names.length;
-      results.push({ idx: [...idx], score: round1(0.6 * indiv + 0.4 * (pairSum / pairN)), key: names.map((n) => n.hanja).join('|') });
+      results.push({ idx: [...idx], score: round1(0.6 * indiv + 0.4 * (pairSum / pairN)), key: names.map((n) => n.hanja).join('|'), set: names.map((n) => n.hanja).sort().join('|') });
       return;
     }
     const list = candidates[k] as Recommendation[];
@@ -239,8 +239,12 @@ export function recommendSiblingSets(
 
   // 같은 이름이 여러 세트를 독차지하지 않도록, 한 이름은 최대 3세트까지
   const used = new Map<string, number>();
+  const seenSets = new Set<string>();
   const out: SiblingSet[] = [];
   for (const r of results) {
+    // 같은 이름 조합을 순서만 바꾼 세트는 점수가 높은 배치 하나만
+    if (seenSets.has(r.set)) continue;
+    seenSets.add(r.set);
     const names = r.idx.map((ci, i) => (candidates[i] as Recommendation[])[ci] as Recommendation);
     if (names.some((n, i) => !children[i]?.given?.length && (used.get(n.hanja) ?? 0) >= 3)) continue;
     for (const n of names) used.set(n.hanja, (used.get(n.hanja) ?? 0) + 1);

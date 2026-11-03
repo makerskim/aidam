@@ -123,3 +123,11 @@ describe('대표음 일치', () => {
     }
   });
 });
+
+describe('외자 + 흉수 성씨', () => {
+  it('남궁(19획) 외자: 이격(=성 획수)은 이름으로 못 바꾸므로 엄격 기준에서 빼고 안내한다', () => {
+    const r = recommendNames({ ...base, surname: [{ hangul: '남', hanja: '南' }, { hangul: '궁', hanja: '宮' }], prefs: { ...DEFAULT_PREFERENCES, length: 1 } });
+    expect(r.length).toBeGreaterThan(0);
+    expect(r[0]!.report.warnings.some((w) => w.includes('이격'))).toBe(true);
+  });
+});

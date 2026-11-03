@@ -1,3 +1,4 @@
+/* global document */
 // 빌드본 스모크 테스트. 사용법: pnpm -C apps/web build && pnpm -C apps/web preview & node apps/web/e2e/smoke.mjs
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
