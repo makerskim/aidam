@@ -96,6 +96,62 @@ export interface NameReport {
 const STRONG_NUMBERS = new Set([21, 23, 33, 39]);
 const elName = (e: Element) => `${ELEMENT_KO[e]}(${ELEMENT_HANJA[e]})`;
 const LUCK_VALUE = { good: 1, half: 0.5, bad: 0 } as const;
+const FRAME_WEIGHTS = { won: 5, hyeong: 5, i: 5, jeong: 7 } as const;
+
+/** ① 자원오행 점수(0..30). 추천 탐색과 분석이 같은 공식을 쓴다. */
+export function resourcePointsFor(entries: readonly HanjaEntry[], saju: SajuAnalysis | null): number {
+  if (saju) {
+    let wsum = 0;
+    let fsum = 0;
+    for (const h of entries) {
+      const w = h.elementConfidence === 'C' ? 0.5 : 1;
+      wsum += w;
+      fsum += w * saju.favor[h.element];
+    }
+    const avg = fsum / wsum;
+    return Math.min(30, ((avg + 1) / 2) * 28 + (entries.some((h) => h.element === saju.yongsin) ? 2 : 0));
+  }
+  if (entries.length === 1) return 20;
+  let s = 0;
+  for (let i = 0; i < entries.length - 1; i++) {
+    const rel = relation((entries[i] as HanjaEntry).element, (entries[i + 1] as HanjaEntry).element);
+    s += rel === 'generates' || rel === 'generatedBy' ? 30 : rel === 'same' ? 20 : 10;
+  }
+  return s / (entries.length - 1);
+}
+
+/** ② 수리 점수(0..25)와 4격 결과 */
+export function suriPointsFor(
+  surnameStrokes: number,
+  strokes: number[],
+  gender: Gender,
+  options: SchoolOptions,
+): { frames: FourFrames; results: FrameResult[]; points: number; noBad: boolean; strongHits: (keyof FourFrames)[] } {
+  const frames = fourFrames(surnameStrokes, strokes);
+  const results: FrameResult[] = [];
+  const strongHits: (keyof FourFrames)[] = [];
+  let points = 0;
+  let noBad = true;
+  for (const key of ['won', 'hyeong', 'i', 'jeong'] as const) {
+    const n = frames[key];
+    const info = suri81(n);
+    let value: number = LUCK_VALUE[info.luck];
+    if (options.femaleStrongNumbers && gender === 'female' && STRONG_NUMBERS.has(n)) {
+      value = Math.min(value, 0.5);
+      strongHits.push(key);
+    }
+    if (info.luck === 'bad') noBad = false;
+    points += FRAME_WEIGHTS[key] * value;
+    results.push({ key, n, info, value, element: suriElement(n) });
+  }
+  let flow = 0;
+  for (let i = 0; i < 3; i++) {
+    const rel = relation((results[i] as FrameResult).element, (results[i + 1] as FrameResult).element);
+    flow += rel === 'generates' || rel === 'generatedBy' ? 1 : rel === 'same' ? 0.5 : 0;
+  }
+  points += (flow / 3) * 3;
+  return { frames, results, points, noBad, strongHits };
+}
 
 function resolve(c: NameChar, warnings: string[], initial: boolean): HanjaEntry | null {
   if (!c.hanja) return null;
@@ -146,16 +202,8 @@ export function analyzeName(
   }));
   let resourcePts: number | null = null;
   if (givenKnown) {
+    resourcePts = resourcePointsFor(chars as HanjaEntry[], saju);
     if (saju) {
-      let wsum = 0;
-      let fsum = 0;
-      for (const r of resource) {
-        const w = r.confidence === 'C' ? 0.5 : 1;
-        wsum += w;
-        fsum += w * (r.favor ?? 0);
-      }
-      const avg = fsum / wsum;
-      resourcePts = Math.min(30, ((avg + 1) / 2) * 28 + (resource.some((r) => r.element === saju.yongsin) ? 2 : 0));
       reasons.push({ area: 'saju', tone: 'neutral', text: `이 사주의 용신은 ${elName(saju.yongsin)}, 희신은 ${elName(saju.huisin)}입니다.` });
       for (const r of resource) {
         const tone = (r.favor ?? 0) > 0.25 ? 'good' : (r.favor ?? 0) < 0 ? 'bad' : 'neutral';
@@ -168,16 +216,6 @@ export function analyzeName(
       }
     } else {
       warnings.push('출생 정보(사주)가 없어 용신 보완은 평가하지 못하고, 한자 오행끼리의 흐름만 봤어요.');
-      const els = resource.map((r) => r.element);
-      if (els.length === 1) resourcePts = 20;
-      else {
-        let s = 0;
-        for (let i = 0; i < els.length - 1; i++) {
-          const rel = relation(els[i] as Element, els[i + 1] as Element);
-          s += rel === 'generates' || rel === 'generatedBy' ? 30 : rel === 'same' ? 20 : 10;
-        }
-        resourcePts = s / (els.length - 1);
-      }
       for (const r of resource) reasons.push({ area: 'resource', tone: 'neutral', text: `${r.ch} 자원오행 ${elName(r.element)}` });
     }
   }
@@ -190,32 +228,21 @@ export function analyzeName(
   let suriPts: number | null = null;
   let strictFrames = true;
   if (surnameStrokes !== null && givenKnown) {
-    frames = fourFrames(surnameStrokes, chars.map((h) => (h as HanjaEntry).strokes));
-    const weights = { won: 5, hyeong: 5, i: 5, jeong: 7 } as const;
-    suriPts = 0;
-    for (const key of ['won', 'hyeong', 'i', 'jeong'] as const) {
-      const n = frames[key];
-      const info = suri81(n);
-      let value: number = LUCK_VALUE[info.luck];
-      if (options.femaleStrongNumbers && input.gender === 'female' && STRONG_NUMBERS.has(n)) {
-        value = Math.min(value, 0.5);
-        warnings.push(`${FRAME_KO[key].name} ${n}은(는) 여아에게 너무 강한 수로 보는 학설이 있어요.`);
-      }
-      if (info.luck === 'bad') strictFrames = false;
-      suriPts += weights[key] * value;
-      frameResults.push({ key, n, info, value, element: suriElement(n) });
+    const s = suriPointsFor(surnameStrokes, chars.map((h) => (h as HanjaEntry).strokes), input.gender, options);
+    frames = s.frames;
+    suriPts = s.points;
+    strictFrames = s.noBad;
+    frameResults.push(...s.results);
+    for (const key of s.strongHits) {
+      warnings.push(`${FRAME_KO[key].name} ${frames[key]}은(는) 여아에게 너무 강한 수로 보는 학설이 있어요.`);
+    }
+    for (const f of s.results) {
       reasons.push({
         area: 'suri',
-        tone: info.luck === 'good' ? 'good' : info.luck === 'bad' ? 'bad' : 'neutral',
-        text: `${FRAME_KO[key].name}(${FRAME_KO[key].period}) ${n} ${info.name} — ${LUCK_KO[info.luck]}: ${info.desc}`,
+        tone: f.info.luck === 'good' ? 'good' : f.info.luck === 'bad' ? 'bad' : 'neutral',
+        text: `${FRAME_KO[f.key].name}(${FRAME_KO[f.key].period}) ${f.n} ${f.info.name} — ${LUCK_KO[f.info.luck]}: ${f.info.desc}`,
       });
     }
-    let flow = 0;
-    for (let i = 0; i < 3; i++) {
-      const rel = relation((frameResults[i] as FrameResult).element, (frameResults[i + 1] as FrameResult).element);
-      flow += rel === 'generates' || rel === 'generatedBy' ? 1 : rel === 'same' ? 0.5 : 0;
-    }
-    suriPts += (flow / 3) * 3;
   }
 
   // ③ 음령오행
