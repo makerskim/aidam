@@ -1,0 +1,17 @@
+{
+  "name": "aidam",
+  "private": true,
+  "version": "1.0.0",
+  "description": "아이담 — 아이의 이름에 의미를 담다. 정통 성명학 기반 아기 작명 사이트",
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "build": "pnpm -C apps/web build",
+    "dev": "pnpm -C apps/web dev",
+    "lint": "eslint .",
+    "data:build": "node tools/build-data/build-hanja.mjs && node tools/build-data/build-tz.mjs"
+  }
+}
