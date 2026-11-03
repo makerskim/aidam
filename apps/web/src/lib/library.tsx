@@ -7,6 +7,8 @@ interface Library {
   /** 최근 순 */
   entries: LibraryEntry[];
   user: CloudUser | null;
+  /** Firebase 연결 전 임시 미리보기 계정인지 */
+  isPreview: boolean;
   cloudReady: boolean;
   cloudConfigured: boolean;
   syncError: string | null;
@@ -22,6 +24,8 @@ interface Library {
 
 const Ctx = createContext<Library | null>(null);
 const KEY = 'library';
+const PREVIEW_KEY = 'preview-user';
+const PREVIEW_USER: CloudUser = { uid: 'preview', name: '미리보기 계정', email: null, photo: null };
 export const entryId = (query: string) => fnv1a(query);
 
 function loadLocal(): LibraryEntry[] {
@@ -39,14 +43,15 @@ const byRecent = (a: LibraryEntry, b: LibraryEntry) => b.savedAt - a.savedAt;
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<LibraryEntry[]>(() => loadLocal().sort(byRecent));
-  const [user, setUser] = useState<CloudUser | null>(null);
+  const [user, setUser] = useState<CloudUser | null>(() => (!cloudConfigured && readStored(PREVIEW_KEY, false) ? PREVIEW_USER : null));
   const [cloudReady, setCloudReady] = useState(!cloudConfigured);
+  const isPreview = !cloudConfigured && user !== null;
   const [syncError, setSyncError] = useState<string | null>(null);
-  const userRef = useRef<CloudUser | null>(null);
+  const userRef = useRef<CloudUser | null>(user);
 
-  // 로그아웃 상태의 기록만 기기에 둔다 (계정 기록은 계정 저장소에만)
+  // 미리보기 계정의 기록은 기기에, 실제 계정 기록은 계정 저장소에만 둔다
   useEffect(() => {
-    if (!userRef.current) writeStored(KEY, entries);
+    if (!cloudConfigured) writeStored(KEY, entries);
   }, [entries]);
 
   // 로그인 상태: 첫 화면을 그린 뒤 불러온다
@@ -100,6 +105,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const record = useCallback<Library['record']>(
     (e, bookmark) => {
+      // 로그인하지 않으면 저장하지 않는다
+      if (!userRef.current) return;
       const id = entryId(e.query);
       setEntries((prev) => {
         const old = prev.find((x) => x.id === id);
@@ -121,7 +128,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       syncError,
       record,
       isBookmarked: (hanja, query) => entries.some((x) => x.bookmarked && (query ? x.id === entryId(query) : x.hanja === hanja)),
+      isPreview,
       toggleBookmark: (e) => {
+        if (!userRef.current) return;
         const id = entryId(e.query);
         const old = entries.find((x) => x.id === id);
         upsert({ ...e, id, savedAt: old?.savedAt ?? Date.now(), bookmarked: !old?.bookmarked });
@@ -138,6 +147,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       },
       signIn: async () => {
         setSyncError(null);
+        if (!cloudConfigured) {
+          writeStored(PREVIEW_KEY, true);
+          userRef.current = PREVIEW_USER;
+          setUser(PREVIEW_USER);
+          return;
+        }
         try {
           await signInWithGoogle();
         } catch (e) {
@@ -148,11 +163,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
       },
       signOut: async () => {
+        if (!cloudConfigured) {
+          writeStored(PREVIEW_KEY, false);
+          userRef.current = null;
+          setUser(null);
+          return;
+        }
         await signOutCloud();
-        setEntries(loadLocal().sort(byRecent));
+        setEntries([]);
       },
     }),
-    [entries, user, cloudReady, syncError, record, upsert],
+    [entries, user, isPreview, cloudReady, syncError, record, upsert],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

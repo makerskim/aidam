@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Gender, NameChar } from '@aidam/engine';
-import { BirthFields, birthFromDraft, draftFromBirth, EMPTY_BIRTH, HanjaPicker, SchoolOptionsPanel, SurnamePicker, type BirthDraft } from '../components/forms';
-import { Cta, ErrorText, Field, Icon, Segmented, Switch } from '../components/ui';
+import { BirthFields, birthFromDraft, draftFromBirth, EMPTY_BIRTH, HanjaPicker, SurnamePicker, type BirthDraft } from '../components/forms';
+import { Cta, ErrorText, Field, Segmented, Switch } from '../components/ui';
+import { useSettings } from '../lib/settings';
 import { useStoredState } from '../lib/storage';
-import { DEFAULT_SAJU, DEFAULT_SCHOOL, fromSearch, STATE_VERSION, toQuery, type AnalyzeState, type SurnameSel } from '../lib/state';
+import { fromSearch, STATE_VERSION, toQuery, type AnalyzeState, type SurnameSel } from '../lib/state';
 
 interface Draft {
   surname: SurnameSel | null;
@@ -12,17 +13,15 @@ interface Draft {
   hanja: (string | null)[];
   gender: Gender;
   birth: BirthDraft;
-  school: AnalyzeState['school'];
-  sajuOpts: AnalyzeState['sajuOpts'];
 }
 
-const EMPTY: Draft = { surname: null, givenText: '', hanja: [], gender: 'female', birth: EMPTY_BIRTH, school: DEFAULT_SCHOOL, sajuOpts: DEFAULT_SAJU };
+const EMPTY: Draft = { surname: null, givenText: '', hanja: [], gender: 'female', birth: EMPTY_BIRTH };
 
 export function SelfAnalyze() {
   const { search } = useLocation();
   const navigate = useNavigate();
   const fromUrl = useMemo(() => fromSearch<AnalyzeState>(search), [search]);
-  const [stored, setStored] = useStoredState<Draft>('draft-self-v2', EMPTY);
+  const [stored, setStored] = useStoredState<Draft>('draft-self-v3', EMPTY);
   const [draft, setDraftState] = useState<Draft>(() =>
     fromUrl
       ? {
@@ -31,12 +30,11 @@ export function SelfAnalyze() {
           hanja: fromUrl.given.map((g) => g.hanja),
           gender: fromUrl.gender,
           birth: draftFromBirth(fromUrl.birth),
-          school: fromUrl.school,
-          sajuOpts: fromUrl.sajuOpts,
         }
       : { ...EMPTY, ...stored },
   );
   const [error, setError] = useState<string | null>(null);
+  const [settings] = useSettings();
   const setDraft = (patch: Partial<Draft>) => {
     const next = { ...draft, ...patch };
     setDraftState(next);
@@ -52,16 +50,20 @@ export function SelfAnalyze() {
     if (syllables.length === 0) return setError('이름을 한글로 입력해 주세요.');
     if (birthResult.error) return setError(birthResult.error);
     const given: NameChar[] = syllables.map((h, i) => ({ hangul: h, hanja: draft.hanja[i] ?? null }));
-    const state: AnalyzeState = { v: STATE_VERSION, surname: draft.surname, gender: draft.gender, birth: birthResult.birth, given, school: draft.school, sajuOpts: draft.sajuOpts };
+    const state: AnalyzeState = { v: STATE_VERSION, surname: draft.surname, gender: draft.gender, birth: birthResult.birth, given, school: settings.school, sajuOpts: settings.sajuOpts };
     navigate(`/report?${toQuery(state)}`);
   };
 
   return (
-    <main className="stack-lg">
-      <h1>지은 이름 풀어보기</h1>
+    <main className="container narrow page stack-lg">
+      <div>
+        <span className="section-kicker">지은 이름 풀어보기</span>
+        <h1 style={{ marginTop: 4 }}>마음에 둔 이름을 알려 주세요</h1>
+        <p className="q-sub">한자까지 고르면 사주에 맞는지, 무엇이 좋고 아쉬운지 풀어 드려요.</p>
+      </div>
       <SurnamePicker label="성" value={draft.surname} onChange={(surname) => setDraft({ surname })} />
       <Field label="이름" htmlFor="given">
-        <input id="given" className="input" placeholder="예: 서윤" value={draft.givenText} maxLength={4} onChange={(e) => setDraft({ givenText: e.target.value, hanja: [] })} />
+        <input id="given" className="input" placeholder="예: 서윤" value={draft.givenText} maxLength={4} onChange={(e) => setDraft({ givenText: e.target.value, hanja: [] })} style={{ maxWidth: 360 }} />
       </Field>
       <Field label="성별">
         <Segmented
@@ -76,7 +78,7 @@ export function SelfAnalyze() {
         />
       </Field>
       <div className="stack">
-        <Switch checked={draft.birth.known} onChange={(known) => setDraft({ birth: { ...draft.birth, known } })} title="생일 넣고 사주까지 보기" />
+        <Switch checked={draft.birth.known} onChange={(known) => setDraft({ birth: { ...draft.birth, known } })} title="생일을 넣고 사주까지 볼게요" />
         {draft.birth.known ? <BirthFields idPrefix="self" value={draft.birth} onChange={(birth) => setDraft({ birth })} /> : null}
       </div>
       {syllables.map((s, i) => (
@@ -85,7 +87,7 @@ export function SelfAnalyze() {
             syllable={s}
             initial={i === 0}
             birth={birthResult.birth}
-            sajuOpts={draft.sajuOpts}
+            sajuOpts={settings.sajuOpts}
             value={draft.hanja[i] ?? null}
             onChange={(ch) => {
               const hanja = [...draft.hanja];
@@ -95,21 +97,9 @@ export function SelfAnalyze() {
           />
         </Field>
       ))}
-      <details className="acc">
-        <summary>
-          <span className="grow">
-            <b>세부 설정</b>
-            <span className="v">학설·시간 보정</span>
-          </span>
-          {Icon.chevron}
-        </summary>
-        <div className="acc-body">
-          <SchoolOptionsPanel school={draft.school} saju={draft.sajuOpts} onSchool={(school) => setDraft({ school })} onSaju={(sajuOpts) => setDraft({ sajuOpts })} showSaju={draft.birth.known} />
-        </div>
-      </details>
       <ErrorText>{error}</ErrorText>
       <Cta>
-        <button type="button" className="btn btn-primary" onClick={submit}>
+        <button type="button" className="btn btn-primary btn-lg" onClick={submit}>
           풀이 보기
         </button>
       </Cta>

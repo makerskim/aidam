@@ -27,25 +27,27 @@ export function Report() {
 
   if (!state) {
     return (
-      <main className="stack">
+      <main className="container narrow page stack">
         <h1>풀이할 이름 정보가 없어요</h1>
-        <Link className="btn btn-primary" to="/self">
-          이름 풀어보기
+        <Link className="btn btn-primary" to="/">
+          처음으로
         </Link>
       </main>
     );
   }
   return (
-    <main className="stack-lg">
+    <main className="container page stack-lg">
       {error ? <ErrorText>{error}</ErrorText> : null}
       {!error ? (
         <Staged steps={['사주를 세우고 있어요', '한자의 뜻과 기운을 살피고 있어요', '획수와 소리를 따져 보고 있어요']} done={Boolean(data)}>
           {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} /> : null}
         </Staged>
       ) : null}
-      <Link className="btn btn-secondary btn-block" to={`/self?${toQuery(state)}`}>
-        한자 바꿔 보기
-      </Link>
+      <div className="row">
+        <Link className="btn btn-outline" to={`/self?${toQuery(state)}`}>
+          한자 바꿔 보기
+        </Link>
+      </div>
       <Disclaimer />
     </main>
   );

@@ -75,7 +75,7 @@ export function MyNames() {
   const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 3 ? p : [...p, id]));
 
   return (
-    <main className="stack-lg">
+    <main className="container narrow page stack-lg">
       <h1>내 이름함</h1>
       <LoginCard />
       {lib.syncError ? <p className="error">{lib.syncError}</p> : null}

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ELEMENT_HANJA, type Element } from '@aidam/engine/src/core/elements';
 import { useStagedSteps } from '../lib/motion';
-import { ELEMENT_HANJA, ELEMENT_KO, type Element } from '@aidam/engine/src/core/elements';
+import { PLAIN } from '../lib/insights';
 
 export const Icon = {
   chevron: (
@@ -8,19 +9,24 @@ export const Icon = {
       <path d="M9 6l6 6-6 6" />
     </svg>
   ),
+  down: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  ),
   back: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M15 6l-6 6 6 6" />
     </svg>
   ),
-  heart: (filled: boolean) => (
-    <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
-    </svg>
-  ),
   bookmark: (filled: boolean) => (
     <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
       <path d="M6 4h12v16l-6-4-6 4z" />
+    </svg>
+  ),
+  share: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12M7 8l5-5 5 5M5 14v5h14v-5" />
     </svg>
   ),
   google: (
@@ -29,11 +35,6 @@ export const Icon = {
       <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
       <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
       <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.6 44 33 44 24c0-1.3-.1-2.4-.4-3.5z" />
-    </svg>
-  ),
-  share: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3v12M7 8l5-5 5 5M5 14v5h14v-5" />
     </svg>
   ),
 };
@@ -53,17 +54,7 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
   );
 }
 
-export function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-  label: string;
-}) {
+export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {options.map((o) => (
@@ -75,31 +66,26 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Switch({ checked, onChange, title }: { checked: boolean; onChange: (v: boolean) => void; title: string }) {
+export function Switch({ checked, onChange, title, desc }: { checked: boolean; onChange: (v: boolean) => void; title: string; desc?: string }) {
   return (
     <label className="switch">
-      <span>{title}</span>
+      <span>
+        {title}
+        {desc ? <small>{desc}</small> : null}
+      </span>
       <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
 }
 
+/** 오행 표시: 한자 + 쉬운 말(나무·불·흙·쇠·물) */
 export function ElementChip({ element, withName = false }: { element: Element | string; withName?: boolean }) {
   const e = element as Element;
   return (
-    <span className={`el el-${e}`} title={`${ELEMENT_KO[e]}(${ELEMENT_HANJA[e]})`}>
+    <span className={`el el-${e}`} title={PLAIN[e]}>
       {ELEMENT_HANJA[e]}
-      {withName ? ELEMENT_KO[e] : null}
+      {withName ? ` ${PLAIN[e]}` : null}
     </span>
-  );
-}
-
-export function Loading({ text }: { text: string }) {
-  return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" />
-      <span>{text}</span>
-    </div>
   );
 }
 
@@ -111,12 +97,9 @@ export function Disclaimer() {
   return <p className="tiny muted">전통 성명학에 따른 참고 정보예요. 출생신고 전 대법원 인명용 한자를 확인하세요.</p>;
 }
 
+/** 아래 버튼 묶음: 데스크톱은 오른쪽 정렬, 모바일은 화면 아래 고정 */
 export function Cta({ children }: { children: ReactNode }) {
-  return (
-    <div className="cta">
-      <div className="cta-inner">{children}</div>
-    </div>
-  );
+  return <div className="wizard-actions">{children}</div>;
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
@@ -129,13 +112,13 @@ export function ErrorText({ children }: { children: ReactNode }) {
 
 export function Progress({ step, total }: { step: number; total: number }) {
   return (
-    <div className="progress" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={step} aria-label={`${total}단계 중 ${step}단계`}>
+    <div className="progress" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={step} aria-label={`${total}단계 중 ${step}단계`} style={{ flex: 1 }}>
       <i style={{ width: `${(step / total) * 100}%` }} />
     </div>
   );
 }
 
-/** 전문가가 차근차근 살피는 듯한 단계별 분석 화면. done이 되고 단계를 다 보여 주면 children을 그린다 */
+/** 전문가가 차근차근 살피는 듯한 단계별 분석 화면 */
 export function Staged({ steps, done, children }: { steps: string[]; done: boolean; children: ReactNode }) {
   const { index, finished } = useStagedSteps(steps, done);
   if (finished) return <>{children}</>;
@@ -149,6 +132,132 @@ export function Staged({ steps, done, children }: { steps: string[]; done: boole
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+// ── 모달 ───────────────────────────────────────────────
+export function Modal({ open, onClose, labelledBy, children }: { open: boolean; onClose: () => void; labelledBy: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    ref.current?.querySelector<HTMLElement>('button')?.focus();
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={labelledBy} ref={ref}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── 피커: 모든 선택 항목을 같은 모양으로 ───────────────────
+export interface PickerOption {
+  value: string;
+  label: string;
+  sub?: string;
+}
+export interface PickerGroup {
+  title?: string;
+  cols?: number;
+  options: PickerOption[];
+}
+
+export function Picker({
+  id,
+  label,
+  placeholder,
+  value,
+  groups,
+  onChange,
+  disabled = false,
+  align = 'left',
+  display,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  groups: PickerGroup[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  align?: 'left' | 'right';
+  display?: (v: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const all = groups.flatMap((g) => g.options);
+  const current = all.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    const sel = wrap.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? wrap.current?.querySelector<HTMLElement>('[data-anchor="true"]') ?? wrap.current?.querySelector<HTMLElement>('.pk-opt');
+    sel?.scrollIntoView({ block: 'center' });
+    sel?.focus();
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="pk" ref={wrap}>
+      <button
+        id={id}
+        type="button"
+        className="pk-field"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${label}${current ? ` ${current.label}` : ''}`}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {current ? <span>{display ? display(value) : current.label}</span> : <span className="ph">{placeholder}</span>}
+        {Icon.down}
+      </button>
+      {open ? (
+        <>
+          <div className="pk-backdrop" onMouseDown={() => setOpen(false)} />
+          <div className={`pk-pop ${align === 'right' ? 'right' : ''}`} role="listbox" aria-label={label}>
+            <div className="pk-head">{label}</div>
+            {groups.map((g, gi) => (
+              <div key={gi} className="pk-group">
+                {g.title ? <div className="pk-head" style={{ fontWeight: 700, color: 'var(--text-3)' }}>{g.title}</div> : null}
+                <div className="pk-grid" style={{ ['--cols' as string]: String(g.cols ?? 4) }}>
+                  {g.options.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      role="option"
+                      className="pk-opt"
+                      aria-selected={o.value === value}
+                      data-anchor={o.value === '2026' ? 'true' : undefined}
+                      onClick={() => {
+                        onChange(o.value);
+                        setOpen(false);
+                      }}
+                    >
+                      {o.label}
+                      {o.sub ? <small>{o.sub}</small> : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

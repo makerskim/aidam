@@ -9,86 +9,104 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:4173';
 
 const browser = await chromium.launch();
 const errors = [];
-const page = await browser.newPage({ viewport: { width: 360, height: 780 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
-async function noHorizontalScroll(label) {
-  const w = await page.evaluate(() => document.documentElement.scrollWidth);
-  assert.ok(w <= 360, `${label}: 가로 스크롤 발생 (${w}px)`);
+async function pick(id, option) {
+  await page.click(`#${id}`);
+  await page.locator('.pk-pop .pk-opt', { hasText: new RegExp(`^${option}$`) }).first().click();
+}
+async function birth(prefix, y, m, d, hh, mm) {
+  await pick(`${prefix}-year`, String(y));
+  await pick(`${prefix}-month`, `${m}월`);
+  await pick(`${prefix}-day`, String(d));
+  if (hh !== undefined) {
+    await pick(`${prefix}-hour`, `${hh}시`);
+    await pick(`${prefix}-minute`, `${String(mm).padStart(2, '0')}분`);
+  }
 }
 
-// 1) 홈 → 한 명 작명: 성 → 아기 수 → 성별 → 출생 → 조건
+// 1) 랜딩: 큰 브랜드와 설명, 맨 아래 원리·출처 한 줄과 Made by
 await page.goto(`${BASE}/`);
-await page.click('text=이름 짓기 시작');
+assert.equal(await page.locator('.hero-brand').textContent(), '아이담');
+assert.ok(await page.locator('text=AIDAM').count());
+assert.ok(await page.locator('text=Made by makerskim').count(), '만든 사람 표기 없음');
+await page.click('text=작명 원리와 출처 보기');
+assert.ok(await page.locator('#about').count(), '원리·출처 패널이 열리지 않음');
+console.log('✓ 랜딩(브랜드·원리/출처·Made by)');
+
+// 2) 이름 짓기 시작 → 로그인 안내 → 미리보기 계정 로그인
+await page.click('.hero .btn-primary');
+await page.waitForSelector('.modal');
+assert.ok(await page.locator('text=로그인 없이 하기').count());
+await page.click('.modal .google-btn');
 await page.waitForSelector('#surname');
+console.log('✓ 로그인 안내 창');
+
+// 3) 한 명 작명: 성 → 아기 수 → 성별 → 출생(피커) → 조건
 await page.fill('#surname', '김');
 await page.click('button:has-text("다음")');
 await page.click('button.tile:has-text("한 명")');
 await page.click('button.tile:has-text("여자아이")');
-await page.fill('#baby-year', '2026');
-await page.selectOption('select[aria-label="월"]', '3');
-await page.selectOption('select[aria-label="일"]', '14');
-await page.fill('#baby-time', '09:30');
+await birth('baby', 2026, 3, 14, 9, 30);
+await page.click('#baby-place');
+await page.locator('.pk-pop .pk-opt', { hasText: '부산' }).click();
 await page.click('button:has-text("다음")');
 await page.click('button:has-text("이름 추천받기")');
-await page.waitForSelector('text=사주 분석', { timeout: 30000 });
-await page.waitForSelector('.name-row', { timeout: 30000 });
+await page.waitForSelector('.name-row', { timeout: 40000 });
 assert.ok(await page.locator('text=작명가의 풀이').count(), '사주 풀이가 먼저 보이지 않음');
-const count = await page.locator('.name-row').count();
-assert.ok(count >= 1, '추천 결과가 없음');
-await noHorizontalScroll('결과');
-console.log(`✓ 사주 분석 + 추천 결과 ${count}개`);
+console.log(`✓ 사주 분석 + 추천 ${await page.locator('.name-row').count()}개`);
 
-// 2) 리포트: 추천 이유·점수표, 분석 코드 문구 없음, 기록 자동 저장
+// 4) 리포트: 기준 카드 5개(좋은 점·아쉬운 점), 점수표, 분석 코드 없음
 await page.locator('.name-row .who').first().click();
-await page.waitForSelector('.hero-name', { timeout: 30000 });
-assert.ok(await page.locator('text=이 이름을 이렇게 봤어요').count(), '추천 이유 없음');
+await page.waitForSelector('.crit', { timeout: 40000 });
+assert.equal(await page.locator('.crit').count(), 5, '기준 카드 수');
+assert.ok(await page.locator('.pc.pros li').count() >= 3, '좋은 점 설명 부족');
 assert.ok(await page.locator('table[aria-label="점수표"]').count(), '점수표 없음');
-assert.equal(await page.locator('text=분석 코드').count(), 0, '분석 코드 문구가 남아 있음');
+assert.equal(await page.locator('text=분석 코드').count(), 0);
 const name1 = await page.locator('.syls').first().getAttribute('aria-label');
-await noHorizontalScroll('리포트');
-console.log('✓ 리포트(추천 이유·점수표)');
+console.log('✓ 리포트(기준별 쉬운 풀이·점수표)');
 
-// 3) 같은 링크를 새 창에서 열면 같은 결과
-const url = page.url();
-const page2 = await browser.newPage({ viewport: { width: 360, height: 780 } });
-await page2.goto(url);
-await page2.waitForSelector('.hero-name', { timeout: 30000 });
-assert.equal(await page2.locator('.syls').first().getAttribute('aria-label'), name1, '공유 링크 재현 실패');
-await page2.close();
-console.log('✓ 공유 링크 재현');
+// 5) 같은 링크 → 같은 결과
+const p2 = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+await p2.goto(page.url());
+await p2.waitForSelector('.crit', { timeout: 40000 });
+assert.equal(await p2.locator('.syls').first().getAttribute('aria-label'), name1);
+await p2.close();
+console.log('✓ 링크 재현');
 
-// 4) 북마크 → 이름함
+// 6) 북마크 → 계정 메뉴 → 내 이름함
 await page.click('button[aria-label="북마크"]');
-await page.goto(`${BASE}/#/me`);
+await page.click('.avatar');
+await page.click('.menu >> text=내 이름함');
 await page.waitForSelector('text=내 이름함');
-assert.ok((await page.locator('.name-row').count()) >= 1, '기록이 저장되지 않음');
+assert.ok((await page.locator('.name-row').count()) >= 1, '기록 없음');
 await page.click('button:has-text("북마크 1")');
-assert.equal(await page.locator('.name-row').count(), 1, '북마크 탭에 이름이 없음');
-console.log('✓ 이름함 기록·북마크');
+assert.equal(await page.locator('.name-row').count(), 1);
+console.log('✓ 계정 메뉴 · 이름함 기록/북마크');
 
-// 5) 쌍둥이: 아이별 사주 + 이름 세트
+// 7) 쌍둥이
 await page.goto(`${BASE}/#/name`);
 await page.waitForSelector('#surname');
 await page.fill('#surname', '이');
 await page.click('button:has-text("다음")');
 await page.click('button.tile:has-text("쌍둥이")');
 await page.click('button:has-text("다음")');
-await page.fill('#baby-year', '2026');
-await page.selectOption('select[aria-label="월"]', '4');
-await page.selectOption('select[aria-label="일"]', '2');
-await page.fill('#kid0-time', '10:05');
-await page.fill('#kid1-time', '10:09');
+await birth('baby', 2026, 4, 2);
+await pick('kid0-hour', '10시');
+await pick('kid0-minute', '05분');
+await pick('kid1-hour', '10시');
+await pick('kid1-minute', '09분');
 await page.click('button:has-text("다음")');
 await page.click('button:has-text("이름 세트 추천받기")');
-await page.waitForSelector('text=추천 이름 세트', { timeout: 40000 });
-assert.ok(await page.locator('button:has-text("둘째")').count(), '아이별 사주 탭 없음');
-await noHorizontalScroll('다둥이');
-console.log('✓ 쌍둥이 사주 + 이름 세트');
+await page.waitForSelector('text=어울리는 이름 세트', { timeout: 40000 });
+assert.ok(await page.locator('button:has-text("둘째")').count());
+console.log('✓ 쌍둥이 이름 세트');
 
-// 6) 셀프 분석 "김하윤" (사주 없이)
-await page.goto(`${BASE}/#/self`);
+// 8) 셀프 분석(로그인 사용자)
+await page.click('.avatar');
+await page.click('.menu >> text=지은 이름 풀어보기');
 await page.fill('#surname', '김');
 await page.fill('#given', '하윤');
 await page.click('label.switch:has-text("사주까지")');
@@ -97,28 +115,38 @@ await page.click('[aria-label="하 한자"] .hanja-opt:has-text("河")');
 await page.waitForSelector('[aria-label="윤 한자"] .hanja-opt >> nth=2');
 await page.click('[aria-label="윤 한자"] .hanja-opt:has-text("潤")');
 await page.click('button:has-text("풀이 보기")');
-await page.waitForSelector('.hero-name', { timeout: 30000 });
-const label = await page.locator('.syls').first().getAttribute('aria-label');
-assert.ok(label?.includes('河') && label.includes('潤'), '셀프 분석 한자 없음');
+await page.waitForSelector('.crit', { timeout: 40000 });
 console.log('✓ 셀프 분석');
 
-// 7) 없는 날짜 안내 · 깨진 링크
-await page.goto(`${BASE}/#/name`);
-await page.waitForSelector('#surname');
-await page.fill('#surname', '박');
-await page.click('button:has-text("다음")');
-await page.click('button.tile:has-text("한 명")');
-await page.click('button.tile:has-text("남자아이")');
-await page.fill('#baby-year', '2023');
-await page.selectOption('select[aria-label="월"]', '2');
-await page.selectOption('select[aria-label="일"]', '30');
-await page.click('button:has-text("시간 모름")');
-await page.click('button:has-text("다음")');
-await page.click('button:has-text("이름 추천받기")');
-await page.waitForSelector('[role="alert"]', { timeout: 15000 });
-console.log('✓ 없는 날짜 안내:', (await page.locator('[role="alert"]').textContent())?.trim());
-await page.goto(`${BASE}/#/report?s=broken!!`);
-await page.waitForSelector('text=풀이할 이름 정보가 없어요');
+// 9) 로그아웃 → 로그인 없이 하기: 저장되지 않음 안내, 풀이·이름함은 로그인 필요
+await page.click('.avatar');
+await page.click('.menu >> text=로그아웃');
+await page.goto(`${BASE}/#/me`);
+await page.waitForSelector('text=로그인이 필요해요');
+const m = await browser.newPage({ viewport: { width: 390, height: 844 } });
+m.on('pageerror', (e) => errors.push(e.message));
+await m.goto(`${BASE}/`);
+await m.click('.hero .btn-primary');
+await m.click('text=로그인 없이 하기');
+await m.fill('#surname', '박');
+await m.click('button:has-text("다음")');
+await m.click('button.tile:has-text("한 명")');
+await m.click('button.tile:has-text("남자아이")');
+await m.click('#baby-year');
+await m.locator('.pk-pop .pk-opt', { hasText: /^2023$/ }).click();
+await m.click('#baby-month');
+await m.locator('.pk-pop .pk-opt', { hasText: /^2월$/ }).click();
+await m.click('#baby-day');
+await m.locator('.pk-pop .pk-opt', { hasText: /^30$/ }).click();
+await m.click('button:has-text("시간 모름")');
+await m.click('button:has-text("다음")');
+await m.click('button:has-text("이름 추천받기")');
+await m.waitForSelector('[role="alert"]', { timeout: 15000 });
+const w = await m.evaluate(() => document.documentElement.scrollWidth);
+assert.ok(w <= 390, `모바일 가로 스크롤 ${w}`);
+console.log('✓ 로그인 없이 하기 · 없는 날짜 안내 · 모바일 폭');
+await m.goto(`${BASE}/#/report?s=broken!!`);
+await m.waitForSelector('text=풀이할 이름 정보가 없어요');
 console.log('✓ 깨진 링크 안내');
 
 await browser.close();

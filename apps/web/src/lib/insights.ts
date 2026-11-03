@@ -1,10 +1,11 @@
 import type { NameReport, SajuAnalysis } from '@aidam/engine';
-import { ELEMENT_HANJA, ELEMENT_KO, type Element } from '@aidam/engine/src/core/elements';
+import { ELEMENT_HANJA, type Element } from '@aidam/engine/src/core/elements';
 import { FRAME_KO } from '@aidam/engine/src/name/suri';
 import { SCHOOL_KO } from '@aidam/engine/src/name/sound';
 import { meaningFor } from './format';
 
-const el = (e: Element) => `${ELEMENT_KO[e]}(${ELEMENT_HANJA[e]})`;
+const WORD: Record<Element, string> = { wood: '나무', fire: '불', earth: '흙', metal: '쇠', water: '물' };
+const el = (e: Element) => `${WORD[e]}(${ELEMENT_HANJA[e]})`;
 
 export interface Insights {
   /** 좋은 점 */
@@ -148,17 +149,16 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
   ];
 }
 
-/** 목록용 짧은 태그 (좋은 것 최대 3개 + 주의 개수) */
+/** 목록용 짧은 태그 (좋은 것 최대 3개 + 아쉬운 점 개수) */
 export function shortTags(report: NameReport, saju: SajuAnalysis | null): { good: string[]; caution: number } {
   const tags: string[] = [];
   if (saju) {
-    const roles = report.resource.map((r) => saju.roles[r.element]);
-    if (roles.includes('yong')) tags.push(`용신 ${ELEMENT_HANJA[saju.yongsin]} 보완`);
-    else if (roles.includes('hui')) tags.push(`희신 ${ELEMENT_HANJA[saju.huisin]} 보완`);
+    const fill = report.resource.filter((r) => saju.roles[r.element] === 'yong' || saju.roles[r.element] === 'hui');
+    if (fill.length) tags.push(`부족한 ${[...new Set(fill.map((r) => WORD[r.element]))].join('·')} 기운을 채워요`);
   }
-  if (report.frames && report.frameResults.every((f) => f.info.luck === 'good')) tags.push('4격 모두 길');
+  if (report.frames && report.frameResults.every((f) => f.info.luck !== 'bad')) tags.push('평생 운이 좋은 획수');
   const flow = report.soundBySchool[report.options.soundSchool];
-  if (flow.pairs.length && flow.pairs.every((p) => p.kind === 'forward' || p.kind === 'backward')) tags.push('소리 상생');
+  if (flow.pairs.length && !flow.pairs.some((p) => p.kind === 'clash')) tags.push('부르는 소리가 어울려요');
   return { good: tags.slice(0, 3), caution: insights(report, saju).caution.length };
 }
 
@@ -228,13 +228,13 @@ export function sajuNarrative(a: SajuAnalysis): string {
   const parts: string[] = [];
   parts.push(`${season}에 태어난 ${img}(${['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'][a.pillars.day.stem]}${ELEMENT_HANJA[a.dayMaster]}) 같은 아이예요.`);
   if (a.strength.level === 'strong' || a.strength.level === 'veryStrong') {
-    parts.push(`${strong.length ? `${strong.map((e) => ELEMENT_KO[e]).join('·')} 기운이 넉넉해 ` : ''}스스로 힘이 센 사주라, 그 힘을 잘 쓰게 이끌어 줄 ${el(a.yongsin)} 기운이 필요해요.`);
+    parts.push(`${strong.length ? `${strong.map((e) => WORD[e]).join('·')} 기운이 넉넉해 ` : ''}스스로 힘이 센 사주라, 그 힘을 잘 쓰게 이끌어 줄 ${el(a.yongsin)} 기운이 필요해요.`);
   } else if (a.strength.level === 'weak' || a.strength.level === 'veryWeak') {
     parts.push(`둘레의 기운에 비해 타고난 힘이 여린 편이라, 곁에서 받쳐 줄 ${el(a.yongsin)} 기운이 큰 힘이 돼요.`);
   } else {
-    parts.push(`기운이 고르게 잡힌 사주라, ${lacking.length ? `조금 모자란 ${lacking.map((e) => ELEMENT_KO[e]).join('·')}을 채워 ` : ''}균형을 지켜 주면 좋아요.`);
+    parts.push(`기운이 고르게 잡힌 사주라, ${lacking.length ? `조금 모자란 ${lacking.map((e) => WORD[e]).join('·')}을 채워 ` : ''}균형을 지켜 주면 좋아요.`);
   }
-  parts.push(`${ELEMENT_KO[a.yongsin]}${josa(ELEMENT_KO[a.yongsin], '은', '는')} ${VIRTUE[a.yongsin]}을 뜻해요. 이름에 이 기운을 담아 아이의 삶에 균형을 더해 주세요.`);
+  parts.push(`${WORD[a.yongsin]}${josa(WORD[a.yongsin], '은', '는')} ${VIRTUE[a.yongsin]}을 뜻해요. 이름에 이 기운을 담아 아이의 삶에 균형을 더해 주세요.`);
   return parts.join(' ');
 }
 
@@ -251,7 +251,7 @@ export function nameNarrative(report: NameReport, a: SajuAnalysis | null): strin
   if (a) {
     const good = report.resource.filter((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui');
     const bad = report.resource.filter((r) => a.roles[r.element] === 'gi');
-    if (good.length) parts.push(`${good.map((r) => r.ch).join('·')}의 ${[...new Set(good.map((r) => ELEMENT_KO[r.element]))].join('·')} 기운이 사주에 필요한 자리를 채워 주어, 이름이 아이의 부족한 기운을 보태요.`);
+    if (good.length) parts.push(`${good.map((r) => r.ch).join('·')}의 ${[...new Set(good.map((r) => WORD[r.element]))].join('·')} 기운이 사주에 필요한 자리를 채워 주어, 이름이 아이의 부족한 기운을 보태요.`);
     else if (bad.length) parts.push(`다만 ${bad.map((r) => r.ch).join('·')}의 기운은 사주와 부딪혀요. 같은 소리의 다른 한자를 함께 살펴보세요.`);
   }
   if (report.frames) {
@@ -261,4 +261,207 @@ export function nameNarrative(report: NameReport, a: SajuAnalysis | null): strin
   const flow = report.soundBySchool[report.options.soundSchool];
   if (flow.pairs.length) parts.push(flow.pairs.some((p) => p.kind === 'clash') ? '소리의 흐름에 부딪히는 곳이 한 군데 있어요.' : '부를 때 소리의 기운도 자연스럽게 이어져요.');
   return parts.join(' ');
+}
+
+// ── 쉬운 말 풀이: 기준마다 "무엇이 있어서/없어서 좋은지, 왜 아쉬운지" ─────────
+/** 일상어 오행 이름 */
+export const PLAIN: Record<Element, string> = WORD;
+const plain = (e: Element) => `${PLAIN[e]}(${ELEMENT_HANJA[e]})`;
+/** 받침에 맞는 조사: 쇠(金)를, 불(火)을 */
+const pj = (e: Element, withFinal: string, without: string) => josa(PLAIN[e], withFinal, without);
+
+/** 상생: from이 to를 살린다 */
+const GEN_STORY: Record<Element, string> = {
+  wood: '나무가 불을 지펴 주듯',
+  fire: '불이 타고 남은 재가 흙이 되듯',
+  earth: '흙 속에서 쇠가 나오듯',
+  metal: '쇠에 이슬이 맺혀 물이 되듯',
+  water: '물이 나무를 키우듯',
+};
+/** 상극: from이 to를 누른다 */
+const CTRL_STORY: Record<Element, string> = {
+  wood: '나무 뿌리가 흙을 파고들듯',
+  fire: '불이 쇠를 녹이듯',
+  earth: '흙이 물길을 막듯',
+  metal: '쇠도끼가 나무를 베듯',
+  water: '물이 불을 끄듯',
+};
+
+export type Verdict = 'good' | 'ok' | 'bad';
+
+export interface Criterion {
+  key: 'yongsin' | 'sound' | 'suri' | 'yinyang' | 'meaning';
+  title: string;
+  /** 이 기준이 무엇이고 왜 보는지 (한 줄) */
+  why: string;
+  verdict: Verdict;
+  verdictText: string;
+  /** 좋은 점(있어서 좋은 것, 없어서 좋은 것) */
+  pros: string[];
+  /** 아쉬운 점과 이유 */
+  cons: string[];
+  score: number | null;
+  max: number;
+}
+
+const verdictOf = (ratio: number | null): Verdict => (ratio === null ? 'ok' : ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'ok' : 'bad');
+const VERDICT_TEXT: Record<Verdict, string> = { good: '좋아요', ok: '보통이에요', bad: '아쉬워요' };
+
+/** 다섯 기준을 일반인이 이해하는 말로 풀이한다 */
+export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Criterion[] {
+  const s = report.score;
+  const given = report.input.given;
+  const out: Criterion[] = [];
+
+  // 1) 사주 보완(용신·자원오행)
+  {
+    const pros: string[] = [];
+    const cons: string[] = [];
+    if (!a) {
+      cons.push('생일 정보가 없어 사주에 무엇이 부족한지는 보지 못했어요.');
+    } else if (report.resource.length === 0) {
+      cons.push('한자를 고르면 사주를 채워 주는지 볼 수 있어요.');
+    } else {
+      const need = `${plain(a.yongsin)}·${plain(a.huisin)}`;
+      report.resource.forEach((r) => {
+        const h = report.chars.find((c) => c?.ch === r.ch);
+        const syl = given[report.chars.indexOf(h ?? null)]?.hangul ?? '';
+        const m = h ? meaningFor(h.meaning, syl) : '';
+        const role = a.roles[r.element];
+        const basis = r.confidence === 'C' ? '' : ` ${r.basis.replace('부수 ', '').replace(' (성명학 통설)', '')} 부수라`;
+        if (role === 'yong' || role === 'hui') pros.push(`${r.ch}(${m})는${basis} ${plain(r.element)} 기운을 가진 한자예요. 이 아이에게 필요한 ${plain(r.element)}${pj(r.element, '을', '를')} 채워 줘요.`);
+        else if (role === 'gi' || role === 'gu') cons.push(`${r.ch}(${m})는 ${plain(r.element)} 기운인데, 이 아이 사주에는 ${plain(r.element)}${pj(r.element, '이', '가')} 이미 넉넉하거나 부담이 돼서 더하면 균형이 기울어요.`);
+        else pros.push(`${r.ch}(${m})는 ${plain(r.element)} 기운으로, 사주에 크게 해가 되지 않아요.`);
+      });
+      const bad = report.resource.filter((r) => a.roles[r.element] === 'gi' || a.roles[r.element] === 'gu');
+      if (!bad.length) pros.push(`사주와 부딪히는 ${ORDER.filter((e) => a.roles[e] === 'gi').map(plain).join('')} 기운의 한자가 없어서 좋아요.`);
+      if (!report.resource.some((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui')) cons.push(`이 아이에게 필요한 ${need} 기운을 채우는 한자가 없어요.`);
+    }
+    const ratio = s.partial && report.resource.length === 0 ? null : s.resource / 30;
+    out.push({
+      key: 'yongsin',
+      title: '사주를 채워 주나요',
+      why: '사주에서 가장 부족한 기운(용신)을 이름 한자의 기운으로 채워 주면 좋다고 봐요.',
+      verdict: a ? verdictOf(ratio) : 'ok',
+      verdictText: a ? VERDICT_TEXT[verdictOf(ratio)] : '생일 필요',
+      pros,
+      cons,
+      score: report.resource.length ? s.resource : null,
+      max: 30,
+    });
+  }
+
+  // 2) 소리오행
+  {
+    const school = report.options.soundSchool;
+    const flow = report.soundBySchool[school];
+    const syl = [...report.input.surname, ...given].map((c) => c.hangul);
+    const known = flow.elements.filter((e): e is Element => e !== null);
+    const pros: string[] = [];
+    const cons: string[] = [];
+    flow.pairs.forEach((p, i) => {
+      const from = `${syl[i] ?? ''}(${PLAIN[p.from]})`;
+      const to = `${syl[i + 1] ?? ''}(${PLAIN[p.to]})`;
+      if (p.kind === 'forward') pros.push(`${from} → ${to}: ${GEN_STORY[p.from]} 앞소리가 뒷소리를 살려 줘요.`);
+      else if (p.kind === 'backward') pros.push(`${from} → ${to}: 뒷소리가 앞소리를 살려 주는 관계라 무난해요.`);
+      else if (p.kind === 'same') pros.push(`${from} → ${to}: 같은 기운이라 부딪히지 않아요.`);
+      else cons.push(`${from} → ${to}: ${CTRL_STORY[p.from]} 앞소리가 뒷소리를 눌러요. 부를 때 기운이 끊긴다고 봐요.`);
+    });
+    if (flow.pairs.length && !flow.pairs.some((p) => p.kind === 'clash')) pros.push('서로 누르는 소리(상극)가 하나도 없어서 좋아요.');
+    const other = school === 'haerye' ? 'unhae' : 'haerye';
+    if (report.soundBySchool[other].pairs.some((p) => p.kind === 'clash') && !flow.pairs.some((p) => p.kind === 'clash')) {
+      cons.push(`다른 학설(${other === 'unhae' ? '운해본' : '해례본'})로 보면 부딪히는 곳이 있어요. 학설에 따라 달라지는 부분이에요.`);
+    }
+    out.push({
+      key: 'sound',
+      title: '부를 때 소리가 어울리나요',
+      why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. (${known.map((e) => PLAIN[e]).join(' → ')})`,
+      verdict: verdictOf(s.sound / 20),
+      verdictText: VERDICT_TEXT[verdictOf(s.sound / 20)],
+      pros,
+      cons,
+      score: s.sound,
+      max: 20,
+    });
+  }
+
+  // 3) 획수(81수리)
+  {
+    const pros: string[] = [];
+    const cons: string[] = [];
+    if (!report.frames) cons.push('모든 글자의 한자를 고르면 획수 운을 볼 수 있어요.');
+    for (const f of report.frameResults) {
+      const label = `${FRAME_KO[f.key].period} ${f.n}수(${f.info.name.split('(')[0]})`;
+      if (f.info.luck === 'good') pros.push(`${label}: ${f.info.desc}. 좋은 수예요.`);
+      else if (f.info.luck === 'half') pros.push(`${label}: ${f.info.desc}. 좋고 나쁨이 반반인 수예요.`);
+      else cons.push(`${label}: ${f.info.desc}. 좋지 않은 수예요.`);
+    }
+    if (report.frames && !report.frameResults.some((f) => f.info.luck === 'bad')) pros.push('나쁜 수가 하나도 없어서 좋아요.');
+    out.push({
+      key: 'suri',
+      title: '획수로 본 평생 운',
+      why: '성과 이름 한자의 획수를 더해 초년·청년·장년·말년 네 시기의 운을 봐요(81수리).',
+      verdict: report.frames ? verdictOf(s.suri / 25) : 'ok',
+      verdictText: report.frames ? VERDICT_TEXT[verdictOf(s.suri / 25)] : '한자 필요',
+      pros,
+      cons,
+      score: report.frames ? s.suri : null,
+      max: 25,
+    });
+  }
+
+  // 4) 음양
+  {
+    const pros: string[] = [];
+    const cons: string[] = [];
+    if (report.strokeYinYang) {
+      const odd = report.strokeYinYang.pattern.filter((p) => p === 'yang').length;
+      if (report.strokeYinYang.balanced) pros.push(`획수가 홀수(양) ${odd}개, 짝수(음) ${report.strokeYinYang.pattern.length - odd}개로 섞여 균형이 맞아요.`);
+      else cons.push(`획수가 모두 ${odd ? '홀수(양)' : '짝수(음)'}라 한쪽 기운으로 치우쳐요.`);
+    }
+    if (report.vowel.level === 'harmony') pros.push('밝은 모음(ㅏ·ㅗ)과 어두운 모음(ㅓ·ㅜ·ㅠ)이 섞여 소리가 조화로워요.');
+    else if (report.vowel.level === 'unbalanced') cons.push('모음이 밝은 쪽이나 어두운 쪽 한쪽으로만 쏠려 있어요.');
+    else pros.push('모음 소리가 크게 치우치지 않아요.');
+    out.push({
+      key: 'yinyang',
+      title: '음양의 균형',
+      why: '홀수·짝수 획, 밝은·어두운 모음이 고루 섞여야 이름의 기운이 한쪽으로 기울지 않는다고 봐요.',
+      verdict: verdictOf(s.yinyang / 10),
+      verdictText: VERDICT_TEXT[verdictOf(s.yinyang / 10)],
+      pros,
+      cons,
+      score: s.yinyang,
+      max: 10,
+    });
+  }
+
+  // 5) 뜻·발음
+  {
+    const pros: string[] = [];
+    const cons: string[] = [];
+    report.chars.forEach((h, i) => {
+      if (!h) return;
+      const m = meaningFor(h.meaning, given[i]?.hangul ?? '');
+      if (h.negative) cons.push(`${h.ch}(${m})는 이름에 피하는 뜻이에요.`);
+      else pros.push(`${h.ch}: ‘${m}’`);
+    });
+    if (report.chars.length && !report.chars.some((h) => h?.negative)) pros.push('나쁜 뜻을 가진 한자가 없어서 좋아요.');
+    for (const h of report.chars) if (h?.bulyong) cons.push(`${h.ch}는 옛 작명에서 이름에 잘 쓰지 않던 한자예요(요즘은 흔히 쓰기도 해요).`);
+    const pron = report.pronunciation.join('');
+    if (pron !== report.fullHangul) cons.push(`실제로는 [${pron}]으로 소리 나요. 부를 때 확인해 보세요.`);
+    else pros.push('쓴 그대로 소리 나서 부르기 편해요.');
+    for (const w of report.warnings) if (w.includes('놀림') || w.includes('인명용')) cons.push(w);
+    out.push({
+      key: 'meaning',
+      title: '뜻과 발음',
+      why: '한자의 뜻이 좋은지, 부르기 쉽고 놀림받을 소리가 없는지 봐요.',
+      verdict: verdictOf(s.practical / 15),
+      verdictText: VERDICT_TEXT[verdictOf(s.practical / 15)],
+      pros,
+      cons,
+      score: s.practical,
+      max: 15,
+    });
+  }
+  return out;
 }

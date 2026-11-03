@@ -1,13 +1,14 @@
-import { Component, type ReactNode, useEffect } from 'react';
-import { HashRouter, NavLink, Route, Routes, Link, useLocation } from 'react-router-dom';
-import { Home } from './pages/Home';
+import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
+import { HashRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Landing } from './pages/Landing';
 import { NameWizard } from './pages/NameWizard';
 import { Results } from './pages/Results';
 import { Report } from './pages/Report';
 import { SelfAnalyze } from './pages/SelfAnalyze';
 import { MyNames } from './pages/MyNames';
+import { SettingsPage } from './pages/Settings';
 import { LibraryProvider, useLibrary } from './lib/library';
-import { Guide } from './pages/Guide';
+import { GateProvider, useGate } from './lib/gate';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
@@ -17,7 +18,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   override render() {
     if (this.state.failed) {
       return (
-        <main className="stack">
+        <main className="container narrow page stack">
           <h1>화면을 열지 못했어요</h1>
           <p className="muted">링크가 손상됐을 수 있어요.</p>
           <a className="btn btn-primary" href="#/" onClick={() => this.setState({ failed: false })}>
@@ -38,19 +39,144 @@ function ScrollTop() {
   return null;
 }
 
-function AccountButton() {
+function AccountMenu() {
   const lib = useLibrary();
-  if (lib.user) {
+  const gate = useGate();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  if (!lib.user) {
     return (
-      <Link to="/me" className="avatar" aria-label="내 계정">
-        {lib.user.photo ? <img src={lib.user.photo} alt="" width={30} height={30} referrerPolicy="no-referrer" /> : (lib.user.name ?? 'G').slice(0, 1)}
-      </Link>
+      <button type="button" className="btn btn-sm btn-secondary" onClick={gate.openLogin}>
+        로그인
+      </button>
     );
   }
+  const go = (to: string) => {
+    setOpen(false);
+    navigate(to);
+  };
   return (
-    <Link to="/me" className="login-link">
-      로그인
-    </Link>
+    <div className="account" ref={ref}>
+      <button type="button" className="avatar" aria-haspopup="menu" aria-expanded={open} aria-label="내 계정" onClick={() => setOpen((o) => !o)}>
+        {lib.user.photo ? <img src={lib.user.photo} alt="" referrerPolicy="no-referrer" /> : (lib.user.name ?? 'A').slice(0, 1)}
+      </button>
+      {open ? (
+        <div className="menu" role="menu">
+          <div className="menu-head">
+            <b>{lib.user.name ?? 'Google 계정'}</b>
+            <span className="tiny muted">{lib.user.email ?? (lib.isPreview ? '이 기기에만 저장돼요' : '')}</span>
+          </div>
+          <button type="button" role="menuitem" onClick={() => go('/me')}>
+            내 이름함
+          </button>
+          <button type="button" role="menuitem" onClick={() => go('/self')}>
+            지은 이름 풀어보기
+          </button>
+          <button type="button" role="menuitem" onClick={() => go('/settings')}>
+            설정
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              void lib.signOut();
+              navigate('/');
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Header() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+  return (
+    <header className={`site-header ${scrolled ? 'scrolled' : ''}`}>
+      <div className="container">
+        <Link to="/" className="brand" aria-label="아이담 AIDAM 처음으로">
+          <b>아이담</b>
+          <span>AIDAM</span>
+        </Link>
+        <div className="header-right">
+          <AccountMenu />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function AboutPanel() {
+  return (
+    <div className="about-panel" id="about">
+      <h3>작명 원리</h3>
+      <p>
+        태어난 순간의 절기를 천문 계산으로 찾아 사주팔자(만세력)를 세우고, 나무·불·흙·쇠·물 다섯 기운의 세기를 따져 가장 필요한 기운(용신)을 찾아요. 그다음 네 가지 기준으로 이름을 봐요.
+      </p>
+      <ul className="stack" style={{ margin: 0, paddingLeft: 18, gap: 4 }}>
+        <li>사주 보완(자원오행): 한자의 기운이 부족한 기운을 채우는지</li>
+        <li>소리오행: 이름 첫소리의 기운이 서로 살려 주는지(해례본·운해본)</li>
+        <li>81수리: 획수로 본 초년·청년·장년·말년 운이 좋은 수인지</li>
+        <li>음양과 뜻: 획수·모음의 균형, 한자의 뜻과 발음</li>
+      </ul>
+      <h3>출처</h3>
+      <p>
+        인명용 한자·음·획수 Unicode Unihan Database · 한자 훈음 libhangul · 절기 astronomy-engine · 음력 한국천문연구원 데이터 · 표준시 IANA tz · 글꼴 Pretendard
+      </p>
+      <p className="tiny muted">전통 성명학에 따른 참고 정보예요. 출생신고 전 대법원 인명용 한자를 확인하세요. 같은 정보를 넣으면 언제나 같은 결과가 나와요.</p>
+    </div>
+  );
+}
+
+function Footer() {
+  const [open, setOpen] = useState(false);
+  return (
+    <footer className="site-footer">
+      <div className="container">
+        <button type="button" className="text-btn" aria-expanded={open} aria-controls="about" onClick={() => setOpen((o) => !o)}>
+          작명 원리와 출처 {open ? '닫기' : '보기'}
+        </button>
+        {open ? <AboutPanel /> : null}
+        <span className="made-by">Made by makerskim</span>
+      </div>
+    </footer>
+  );
+}
+
+function RequireUser({ children }: { children: ReactNode }) {
+  const lib = useLibrary();
+  const gate = useGate();
+  if (lib.user) return <>{children}</>;
+  return (
+    <main className="container narrow page stack" style={{ alignItems: 'flex-start' }}>
+      <h1>로그인이 필요해요</h1>
+      <p style={{ color: 'var(--text-2)' }}>지은 이름 풀어보기와 내 이름함은 로그인하면 쓸 수 있어요.</p>
+      <button type="button" className="btn btn-primary" onClick={gate.openLogin}>
+        로그인
+      </button>
+    </main>
   );
 }
 
@@ -58,39 +184,20 @@ function Shell() {
   return (
     <div className="app">
       <ScrollTop />
-      <header className="topbar">
-        <div className="topbar-inner">
-          <Link to="/" className="brand" aria-label="아이담 처음으로">
-            <i aria-hidden="true" />
-            아이담
-          </Link>
-          <nav aria-label="주 메뉴">
-            <NavLink to="/name">짓기</NavLink>
-            <NavLink to="/self">풀이</NavLink>
-            <NavLink to="/me">이름함</NavLink>
-          </nav>
-          <AccountButton />
-        </div>
-      </header>
+      <Header />
       <ErrorBoundary>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/name" element={<NameWizard />} />
           <Route path="/results" element={<Results />} />
           <Route path="/report" element={<Report />} />
-          <Route path="/self" element={<SelfAnalyze />} />
-          <Route path="/siblings" element={<NameWizard />} />
-          <Route path="/manse" element={<NameWizard />} />
-          <Route path="/me" element={<MyNames />} />
-          <Route path="/favorites" element={<MyNames />} />
-          <Route path="/guide" element={<Guide />} />
-          <Route path="*" element={<Home />} />
+          <Route path="/self" element={<RequireUser><SelfAnalyze /></RequireUser>} />
+          <Route path="/me" element={<RequireUser><MyNames /></RequireUser>} />
+          <Route path="/settings" element={<RequireUser><SettingsPage /></RequireUser>} />
+          <Route path="*" element={<Landing />} />
         </Routes>
       </ErrorBoundary>
-      <footer className="footer">
-        <Link to="/guide">작명 원리와 출처</Link>
-        <span>만든 사람 makerskim</span>
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -99,7 +206,9 @@ export function App() {
   return (
     <HashRouter>
       <LibraryProvider>
-        <Shell />
+        <GateProvider>
+          <Shell />
+        </GateProvider>
       </LibraryProvider>
     </HashRouter>
   );
