@@ -11,3 +11,5 @@
 | 서울 표준시 이력 (`packages/engine/src/data/seoul-tz.json`) | IANA tz database (Asia/Seoul), Node.js ICU로 추출 | Public domain |
 
 알려진 한계: 2024년 대법원 인명용 한자 추가분은 Unihan에 아직 반영되지 않아 포함되지 않습니다.
+
+글꼴: 고운바탕(Gowun Batang) — SIL Open Font License 1.1, npm `@fontsource/gowun-batang`으로 자체 호스팅.
