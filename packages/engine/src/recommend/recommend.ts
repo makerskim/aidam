@@ -1,5 +1,6 @@
 import type { Element } from '../core/elements';
 import { decompose } from '../hangul/jamo';
+import { applyDueum } from '../hangul/dueum';
 import { pronounce } from '../hangul/pronounce';
 import {
   analyzeName, resourcePointsFor, suriPointsFor, type Gender, type NameChar, type NameReport, type SchoolOptions,
@@ -89,10 +90,17 @@ interface HangulCandidate {
   preference: number;
 }
 
+/** 대표음(첫 음)이 그 음절인 한자만 (別音으로 읽히는 글자 제외). 이름 첫 자는 두음법칙 허용 */
+function primaryReadingMatches(h: HanjaEntry, syllable: string, initial: boolean): boolean {
+  const primary = h.readings[0] ?? '';
+  return primary === syllable || (initial && applyDueum(primary) === syllable);
+}
+
 function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis | null, options: SchoolOptions): HanjaEntry[] {
   const list = hanjaByReading(syllable, { initial: position === 0 }).filter(
     (h) =>
       isNameHanja(h) && !h.negative && h.meaning !== '' && !(options.excludeBulyong && h.bulyong) &&
+      primaryReadingMatches(h, syllable, position === 0) &&
       (FAMILIAR_HANJA.has(h.ch) || isPositiveMeaning(h.meaning)),
   );
   const key = (h: HanjaEntry) =>

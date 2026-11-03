@@ -10,10 +10,12 @@ export function lunarToSolar(year: number, month: number, day: number, isLeapMon
     throw new RangeError('INVALID_LUNAR_DATE');
   }
   const cal = new KoreanLunarCalendar();
-  if (isLeapMonth && cal.getLunarIntercalationMonth(cal.getLunarData(year)) !== month) {
+  if (!cal.setLunarDate(year, month, day, isLeapMonth)) throw new RangeError('INVALID_LUNAR_DATE');
+  // 왕복 확인: 없는 윤달·날짜를 라이브러리가 다른 날로 바꾸지 않았는지
+  const back = cal.getLunarCalendar();
+  if (back.year !== year || back.month !== month || back.day !== day || Boolean(back.intercalation) !== isLeapMonth) {
     throw new RangeError('INVALID_LUNAR_DATE');
   }
-  if (!cal.setLunarDate(year, month, day, isLeapMonth)) throw new RangeError('INVALID_LUNAR_DATE');
   const s = cal.getSolarCalendar();
   return { year: s.year, month: s.month, day: s.day };
 }

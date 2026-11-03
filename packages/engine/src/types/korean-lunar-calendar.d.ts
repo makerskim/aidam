@@ -4,7 +4,5 @@ declare module 'korean-lunar-calendar' {
     setSolarDate(year: number, month: number, day: number): boolean;
     getSolarCalendar(): { year: number; month: number; day: number };
     getLunarCalendar(): { year: number; month: number; day: number; intercalation: boolean };
-    getLunarData(year: number): number;
-    getLunarIntercalationMonth(lunarData: number): number;
   }
 }

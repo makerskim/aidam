@@ -84,3 +84,10 @@ describe('부정 뜻 판정(대표 훈 기준)', () => {
     expect(getHanja('凶')?.negative).toBe(true);
   });
 });
+
+describe('부정 뜻 보강', () => {
+  it('瑕(티 하)·疵(허물 자)는 이름에 피하는 뜻', () => {
+    expect(getHanja('瑕')?.negative).toBe(true);
+    expect(getHanja('疵')?.negative).toBe(true);
+  });
+});

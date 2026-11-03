@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { recommendNames, DEFAULT_PREFERENCES } from '../src/recommend/recommend';
 import { SYLLABLES, POPULAR_NAMES, FAMILIAR_HANJA } from '../src/recommend/syllables';
 import { isPositiveMeaning } from '../src/name/safety';
+import { applyDueum } from '../src/hangul/dueum';
 import { DEFAULT_SCHOOL_OPTIONS } from '../src/name/analyze';
 import { analyzePillars } from '../src/saju/analysis';
 import { BRANCHES, STEMS, type Pillar } from '../src/core/ganji';
@@ -107,4 +108,18 @@ describe('좋은 뜻 판정', () => {
     expect(isPositiveMeaning('클 태')).toBe(true);
   });
   it('諭(고할 유)는 친숙 한자 목록에 없다', () => expect(FAMILIAR_HANJA.has('諭')).toBe(false));
+});
+
+describe('대표음 일치', () => {
+  it('추천 한자의 대표음(첫 음)이 그 음절과 같다(첫 자는 두음법칙 허용)', () => {
+    const recs = recommendNames({ ...base, limit: 80 });
+    for (const r of recs) {
+      [...r.hanja.slice(1)].forEach((ch, i) => {
+        const h = getHanja(ch);
+        const syl = [...r.hangul][i + 1] as string;
+        const primary = h?.readings[0] ?? '';
+        expect(primary === syl || (i === 0 && applyDueum(primary) === syl), `${ch} ${h?.readings} ${syl}`).toBe(true);
+      });
+    }
+  });
 });
