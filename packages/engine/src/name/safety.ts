@@ -21,3 +21,15 @@ export function isNegativeMeaning(meaning: string): boolean {
 export const BULYONG = new Set([
   ...'甲江光國菊極吉男女東蘭龍末梅明美福富鳳分山石雪星松秀壽淑順勝實愛榮玉完雲月銀仁日子長貞竹地珍眞天鐵春秋出泰平豊夏鶴海好虎花孝輝喜',
 ]);
+
+/** 성과 이어 읽을 때 놀림·비속어가 되는 낱말 */
+const TEASE_WORDS = [
+  '바보', '멍청', '똥', '방구', '방귀', '시발', '씨발', '병신', '븅신', '등신', '개새', '새끼', '지랄', '미친', '변태',
+  '엉덩', '오줌', '고자', '호구', '찐따', '왕따', '쪼다', '염병', '니미', '좆', '섹스', '자지', '보지', '항문', '설사',
+  '변비', '사망', '죽어', '도둑', '강도', '사기꾼', '감옥', '조또', '주길', '죽일', '망해', '개똥', '구라', '돼지',
+];
+
+/** 이름(성 포함 한글)에 놀림 위험 낱말이 있으면 그 낱말, 없으면 null */
+export function teaseWord(fullHangul: string): string | null {
+  return TEASE_WORDS.find((w) => fullHangul.includes(w)) ?? null;
+}
