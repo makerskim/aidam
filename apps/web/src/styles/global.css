@@ -1,40 +1,45 @@
 @import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 
 /* 레이아웃: 데스크톱 우선(최대 1160px 컨테이너, 결과는 왼쪽 고정 2단), 760px 이하에서 한 줄로 */
+/* 밝은 화이트 팔레트: 흰 바탕 + 장미색 포인트 + 살구·라벤더 보조. 기기 다크 모드와 상관없이 항상 밝게 */
 :root {
   --bg: #ffffff;
-  --bg-2: #f3f4f6;
-  --bg-3: #f9fafb;
-  --ink: #111827;
-  --text: #1f2937;
-  --text-2: #4b5563;
+  --bg-2: #f4f5f7;
+  --bg-3: #fafafb;
+  --ink: #1b1e26;
+  --text: #2b2f38;
+  --text-2: #50576a;
   --text-3: #6b7280;
-  --line: #e5e7eb;
+  --line: #e9ebef;
   --primary: #d63a55;
-  --primary-ink: #b02a43;
-  --primary-soft: #fdeef1;
+  --primary-ink: #b42a45;
+  --primary-soft: #fff0f3;
   --on-primary: #ffffff;
+  --peach: #ff9a76;
+  --peach-soft: #fff4ee;
+  --lavender: #a58cf0;
+  --lavender-soft: #f5f1ff;
   --good: #0f7a55;
-  --good-soft: #e3f6ee;
+  --good-soft: #e8f7f0;
   --ok: #8a5a00;
-  --ok-soft: #fff3d6;
+  --ok-soft: #fff5dc;
   --bad: #c0262d;
-  --bad-soft: #fde8e8;
+  --bad-soft: #feecec;
   --wood: #0f7a55;
-  --wood-soft: #e3f6ee;
+  --wood-soft: #e8f7f0;
   --fire: #c0262d;
-  --fire-soft: #fde8e8;
+  --fire-soft: #feecec;
   --earth: #8a5a00;
-  --earth-soft: #fff3d6;
-  --metal: #374151;
-  --metal-soft: #eceef1;
+  --earth-soft: #fff5dc;
+  --metal: #3f4654;
+  --metal-soft: #eef0f3;
   --water: #1d5fbf;
-  --water-soft: #e4effd;
-  --blob-1: #ffd6de;
-  --blob-2: #ffe7cf;
-  --blob-3: #e6e0ff;
-  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
-  --shadow: 0 10px 30px rgba(17, 24, 39, 0.08), 0 2px 6px rgba(17, 24, 39, 0.04);
+  --water-soft: #e8f1fe;
+  --blob-1: #ffe2e8;
+  --blob-2: #ffeadf;
+  --blob-3: #ece6ff;
+  --shadow-sm: 0 1px 2px rgba(27, 30, 38, 0.05);
+  --shadow: 0 12px 32px rgba(27, 30, 38, 0.07), 0 2px 6px rgba(27, 30, 38, 0.04);
   --radius: 18px;
   --radius-sm: 12px;
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
@@ -42,81 +47,6 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #0f1115;
-    --bg-2: #1c1f26;
-    --bg-3: #161920;
-    --ink: #f9fafb;
-    --text: #e5e7eb;
-    --text-2: #c3c8d0;
-    --text-3: #9aa1ac;
-    --line: #2a2f39;
-    --primary: #ff7a90;
-    --primary-ink: #ff95a7;
-    --primary-soft: #3a1f27;
-    --on-primary: #1a0c10;
-    --good: #5fd3a6;
-    --good-soft: #13352a;
-    --ok: #ffd36b;
-    --ok-soft: #3a3016;
-    --bad: #ff8a8a;
-    --bad-soft: #3d1c1e;
-    --wood: #5fd3a6;
-    --wood-soft: #13352a;
-    --fire: #ff8a8a;
-    --fire-soft: #3d1c1e;
-    --earth: #ffd36b;
-    --earth-soft: #3a3016;
-    --metal: #d6dae1;
-    --metal-soft: #2a2f39;
-    --water: #86b8ff;
-    --water-soft: #16294a;
-    --blob-1: #4a1f2b;
-    --blob-2: #43301c;
-    --blob-3: #2b2550;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --bg: #0f1115;
-  --bg-2: #1c1f26;
-  --bg-3: #161920;
-  --ink: #f9fafb;
-  --text: #e5e7eb;
-  --text-2: #c3c8d0;
-  --text-3: #9aa1ac;
-  --line: #2a2f39;
-  --primary: #ff7a90;
-  --primary-ink: #ff95a7;
-  --primary-soft: #3a1f27;
-  --on-primary: #1a0c10;
-  --good: #5fd3a6;
-  --good-soft: #13352a;
-  --ok: #ffd36b;
-  --ok-soft: #3a3016;
-  --bad: #ff8a8a;
-  --bad-soft: #3d1c1e;
-  --wood: #5fd3a6;
-  --wood-soft: #13352a;
-  --fire: #ff8a8a;
-  --fire-soft: #3d1c1e;
-  --earth: #ffd36b;
-  --earth-soft: #3a3016;
-  --metal: #d6dae1;
-  --metal-soft: #2a2f39;
-  --water: #86b8ff;
-  --water-soft: #16294a;
-  --blob-1: #4a1f2b;
-  --blob-2: #43301c;
-  --blob-3: #2b2550;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  color-scheme: dark;
-}
-
 *,
 *::before,
 *::after {
@@ -451,7 +381,7 @@ img {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(17, 24, 39, 0.45);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
@@ -1043,7 +973,7 @@ img {
   margin: 0;
   padding: 22px 24px;
   border-radius: 20px;
-  background: var(--primary-soft);
+  background: linear-gradient(150deg, var(--primary-soft), var(--peach-soft));
   color: var(--ink);
   font-size: 17px;
   line-height: 1.75;
@@ -1390,8 +1320,8 @@ img {
   font-weight: 900;
   letter-spacing: -0.07em;
   line-height: 0.95;
-  color: var(--ink);
-  background: linear-gradient(100deg, var(--ink) 20%, var(--primary) 50%, var(--ink) 80%);
+  color: var(--primary);
+  background: linear-gradient(100deg, var(--primary) 10%, var(--peach) 45%, var(--lavender) 70%, var(--primary) 95%);
   background-size: 250% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -1454,7 +1384,7 @@ img {
   top: 120px;
   height: 460px;
   border-radius: 32px;
-  background: var(--bg-3);
+  background: linear-gradient(160deg, var(--primary-soft), var(--peach-soft) 55%, var(--lavender-soft));
   border: 1px solid var(--line);
   overflow: hidden;
   display: grid;
@@ -1518,7 +1448,8 @@ img {
 .feature {
   border-radius: 24px;
   padding: 28px 24px;
-  background: var(--bg-3);
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -1761,7 +1692,7 @@ img {
     position: fixed;
     inset: 0;
     z-index: 49;
-    background: rgba(17, 24, 39, 0.4);
+    background: rgba(27, 30, 38, 0.18);
     animation: fade-in 0.2s ease;
   }
   .pk-pop,
