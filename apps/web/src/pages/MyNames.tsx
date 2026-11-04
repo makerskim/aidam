@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { NameReport } from '@aidam/engine';
 import { call } from '../lib/engine';
 import { useLibrary } from '../lib/library';
@@ -52,7 +52,9 @@ export function LoginCard() {
 
 export function MyNames() {
   const lib = useLibrary();
-  const [tab, setTab] = useState<'history' | 'bookmark'>('history');
+  const [params, setParams] = useSearchParams();
+  const tab: 'history' | 'bookmark' = params.get('tab') === 'history' ? 'history' : 'bookmark';
+  const setTab = (t: 'history' | 'bookmark') => setParams({ tab: t === 'history' ? 'history' : 'saved' }, { replace: true });
   const [picked, setPicked] = useState<string[]>([]);
   const [reports, setReports] = useState<NameReport[]>([]);
   const [confirming, setConfirming] = useState(false);
@@ -76,15 +78,15 @@ export function MyNames() {
 
   return (
     <main className="container narrow page stack-lg">
-      <h1>내 이름함</h1>
+      <h1>{tab === 'bookmark' ? '저장한 이름' : '검색 기록'}</h1>
       <LoginCard />
       {lib.syncError ? <p className="error">{lib.syncError}</p> : null}
       <Segmented
         label="보기"
         value={tab}
         options={[
-          { value: 'history', label: `기록 ${lib.entries.length}` },
-          { value: 'bookmark', label: `북마크 ${lib.entries.filter((e) => e.bookmarked).length}` },
+          { value: 'bookmark', label: `저장한 이름 ${lib.entries.filter((e) => e.bookmarked).length}` },
+          { value: 'history', label: `검색 기록 ${lib.entries.length}` },
         ]}
         onChange={(v) => {
           setTab(v);
@@ -93,7 +95,7 @@ export function MyNames() {
       />
       {list.length === 0 ? (
         <div className="stack">
-          <p className="muted">{tab === 'bookmark' ? '북마크한 이름이 없어요. 이름 옆의 북마크를 눌러 모아 보세요.' : '아직 풀어 본 이름이 없어요.'}</p>
+          <p className="muted">{tab === 'bookmark' ? '저장한 이름이 없어요. 이름 옆의 저장 표시를 눌러 모아 보세요.' : '아직 본 이름이 없어요.'}</p>
           <Link className="btn btn-primary btn-block" to="/name">
             이름 짓기 시작
           </Link>
@@ -111,10 +113,10 @@ export function MyNames() {
                 <span className="meaning">{dateText(e.savedAt)}</span>
               </Link>
               <span className="score">
-                <b>{e.total}</b>
+                <b>{Math.round(e.total)}</b>
                 <small>{e.grade}</small>
               </span>
-              <button type="button" className="icon-btn" aria-pressed={e.bookmarked} aria-label={e.bookmarked ? `${e.hangul} 북마크 해제` : `${e.hangul} 북마크`} onClick={() => lib.toggleBookmark(e)}>
+              <button type="button" className="icon-btn" aria-pressed={e.bookmarked} aria-label={e.bookmarked ? `${e.hangul} 저장 해제` : `${e.hangul} 저장`} onClick={() => lib.toggleBookmark(e)}>
                 {Icon.bookmark(e.bookmarked)}
               </button>
               {tab === 'history' ? (

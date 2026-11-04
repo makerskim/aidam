@@ -82,11 +82,11 @@ function AccountMenu() {
             <b>{lib.user.name ?? 'Google 계정'}</b>
             <span className="tiny muted">{lib.user.email ?? (lib.isPreview ? '이 기기에만 저장돼요' : '')}</span>
           </div>
-          <button type="button" role="menuitem" onClick={() => go('/me')}>
-            내 이름함
+          <button type="button" role="menuitem" onClick={() => go('/me?tab=saved')}>
+            저장한 이름
           </button>
-          <button type="button" role="menuitem" onClick={() => go('/self')}>
-            정한 이름 풀어보기
+          <button type="button" role="menuitem" onClick={() => go('/me?tab=history')}>
+            검색 기록
           </button>
           <button type="button" role="menuitem" onClick={() => go('/settings')}>
             설정
@@ -175,7 +175,7 @@ function RequireUser({ children }: { children: ReactNode }) {
   return (
     <main className="container narrow page stack" style={{ alignItems: 'flex-start' }}>
       <h1>로그인이 필요해요</h1>
-      <p style={{ color: 'var(--text-2)' }}>내 이름함은 로그인하면 쓸 수 있어요.</p>
+      <p style={{ color: 'var(--text-2)' }}>저장한 이름과 검색 기록은 로그인하면 볼 수 있어요.</p>
       <button type="button" className="btn btn-primary" onClick={gate.openLogin}>
         로그인
       </button>
@@ -195,7 +195,7 @@ function Shell() {
           <Route path="/results" element={<Results />} />
           <Route path="/report" element={<Report />} />
           <Route path="/saju" element={<SajuPage />} />
-          <Route path="/self" element={<RequireUser><SelfAnalyze /></RequireUser>} />
+          <Route path="/self" element={<SelfAnalyze />} />
           <Route path="/me" element={<RequireUser><MyNames /></RequireUser>} />
           <Route path="/settings" element={<RequireUser><SettingsPage /></RequireUser>} />
           <Route path="*" element={<Landing />} />

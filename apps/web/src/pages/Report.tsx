@@ -44,11 +44,6 @@ export function Report() {
           {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} /> : null}
         </Staged>
       ) : null}
-      <div className="row">
-        <Link className="btn btn-outline" to={`/self?${toQuery(state)}`}>
-          한자 바꿔 보기
-        </Link>
-      </div>
       <Disclaimer />
       </div>
     </main>

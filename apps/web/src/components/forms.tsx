@@ -593,39 +593,24 @@ export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | 
   );
 }
 
-// ── 학설·계산 설정 ─────────────────────────────────────
+// ── 설정: 켜고 끄기만 ─────────────────────────────────
 export function SchoolOptionsPanel({ school, saju, onSchool, onSaju }: { school: SchoolOptions; saju: SajuOptions; onSchool: (v: SchoolOptions) => void; onSaju: (v: SajuOptions) => void }) {
   return (
-    <div className="stack" style={{ gap: 8 }}>
-      <Field label="소리오행 기준">
-        <Segmented
-          label="소리오행 기준"
-          value={school.soundSchool}
-          options={[
-            { value: 'haerye', label: '해례본 (훈민정음 원전)' },
-            { value: 'unhae', label: '운해본 (작명소 관행)' },
-          ]}
-          onChange={(v) => onSchool({ ...school, soundSchool: v })}
-        />
-      </Field>
-      <Switch checked={school.strictMode} onChange={(v) => onSchool({ ...school, strictMode: v })} title="나쁜 획수·부딪히는 소리 이름 빼기" desc="추천에서 아쉬운 이름을 미리 걸러요" />
-      <Switch checked={Boolean(school.bothSchoolsNoClash)} onChange={(v) => onSchool({ ...school, bothSchoolsNoClash: v })} title="두 학설 모두 소리가 부딪히지 않게" />
-      <Switch checked={school.femaleStrongNumbers} onChange={(v) => onSchool({ ...school, femaleStrongNumbers: v })} title="여아에게 강한 수(21·23·33·39) 피하기" />
-      <Switch checked={school.excludeBulyong} onChange={(v) => onSchool({ ...school, excludeBulyong: v })} title="옛 작명에서 피하던 한자 빼기" />
-      <Switch checked={school.includeFinalConsonant} onChange={(v) => onSchool({ ...school, includeFinalConsonant: v })} title="받침 소리까지 보기" />
-      <Switch checked={saju.trueSolarTime} onChange={(v) => onSaju({ ...saju, trueSolarTime: v })} title="태어난 지역의 실제 해 시간으로 보정" desc="서울은 약 32분 늦춰 계산해요" />
-      <Switch checked={saju.equationOfTime} onChange={(v) => onSaju({ ...saju, equationOfTime: v })} title="계절별 해 시간 차이(균시차)까지 보정" />
-      <Field label="밤 11시~자정에 태어났다면">
-        <Segmented
-          label="자시 처리"
-          value={saju.ziHour}
-          options={[
-            { value: 'nextDay', label: '다음 날로 보기' },
-            { value: 'yaJasi', label: '그날로 보기' },
-          ]}
-          onChange={(v) => onSaju({ ...saju, ziHour: v })}
-        />
-      </Field>
+    <div className="stack" style={{ gap: 20 }}>
+      <div className="card settings-group">
+        <h2 className="settings-title">이름 고르기</h2>
+        <Switch checked={school.strictMode} onChange={(v) => onSchool({ ...school, strictMode: v })} title="아쉬운 이름 미리 빼기" />
+        <Switch checked={Boolean(school.bothSchoolsNoClash)} onChange={(v) => onSchool({ ...school, bothSchoolsNoClash: v })} title="두 학설 모두 맞는 소리만" />
+        <Switch checked={school.femaleStrongNumbers} onChange={(v) => onSchool({ ...school, femaleStrongNumbers: v })} title="여아는 센 획수 빼기" />
+        <Switch checked={school.excludeBulyong} onChange={(v) => onSchool({ ...school, excludeBulyong: v })} title="예전에 안 쓰던 한자 빼기" />
+        <Switch checked={school.includeFinalConsonant} onChange={(v) => onSchool({ ...school, includeFinalConsonant: v })} title="받침 소리도 보기" />
+      </div>
+      <div className="card settings-group">
+        <h2 className="settings-title">사주 계산</h2>
+        <Switch checked={saju.trueSolarTime} onChange={(v) => onSaju({ ...saju, trueSolarTime: v })} title="태어난 지역 시간으로 보정" />
+        <Switch checked={saju.equationOfTime} onChange={(v) => onSaju({ ...saju, equationOfTime: v })} title="계절 시간차까지 보정" />
+        <Switch checked={saju.ziHour === 'nextDay'} onChange={(v) => onSaju({ ...saju, ziHour: v ? 'nextDay' : 'yaJasi' })} title="밤 11시 이후는 다음 날로" />
+      </div>
     </div>
   );
 }

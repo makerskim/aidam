@@ -4,7 +4,7 @@ import type { NameReport, Recommendation, SajuResult, PillarsResult } from '@aid
 import { ELEMENT_HANJA, ELEMENTS, type Element } from '@aidam/engine/src/core/elements';
 import { BRANCHES, STEMS, branchElement, stemElement, ZODIAC_KO } from '@aidam/engine/src/core/ganji';
 import { meaningFor } from '../lib/format';
-import { explainCriteria, nameHighlights, PLAIN, sajuBrief, sajuNarrative, sajuSummary, type Criterion } from '../lib/insights';
+import { explainCriteria, nameHighlights, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, type Criterion, type SajuRow } from '../lib/insights';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { useCountUp } from '../lib/motion';
@@ -34,7 +34,7 @@ function CountUp({ value }: { value: number }) {
 
 const VERDICT_CLS = { good: 'good', ok: 'ok', bad: 'bad' } as const;
 
-export function PillarTable({ base, small = false }: { base: PillarsResult; small?: boolean }) {
+export function PillarTable({ base, small = false, big = false }: { base: PillarsResult; small?: boolean; big?: boolean }) {
   const p = base.pillars;
   const cols = [
     { head: '태어난 시', pl: p.hour },
@@ -54,7 +54,7 @@ export function PillarTable({ base, small = false }: { base: PillarsResult; smal
       </div>
     );
   return (
-    <div className={`pillars ${small ? 'pillars-sm' : ''}`} aria-label="사주 원국(만세력)">
+    <div className={`pillars ${small ? 'pillars-sm' : ''} ${big ? 'pillars-lg' : ''}`} aria-label="사주 원국(만세력)">
       {cols.map((c) => (
         <div key={c.head} className="pillar-head">
           {c.head}
@@ -159,46 +159,61 @@ export function SajuCard({ saju }: { saju: SajuResult }) {
   );
 }
 
-/** 사주 한눈 요약 (자세히는 사주 페이지에서) */
-export function SajuBrief({ saju, label, detailTo, compact = false }: { saju: SajuResult; label?: string; detailTo: string; compact?: boolean }) {
+/** 만세력: 네 기둥 + 평가(펼쳐서 자세히) */
+export function SajuPanel({ saju, label }: { saju: SajuResult; label?: string }) {
   const b = sajuBrief(saju.primary);
-  const chips = (els: Element[], cls: string) =>
-    els.map((e) => (
-      <span key={e} className={`chip ${cls}`}>
-        {PLAIN[e]}({ELEMENT_HANJA[e]})
-      </span>
-    ));
+  const base = saju.base;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const when = base.corrected
+    ? `${base.solar.year}.${base.solar.month}.${base.solar.day} ${pad(base.corrected.hour)}:${pad(base.corrected.minute)} (지역 보정)`
+    : `${base.solar.year}.${base.solar.month}.${base.solar.day} · 시간 모름`;
   return (
-    <section className="card brief" aria-label={`${label ?? ''} 사주 요약`}>
-      <div className="brief-top">
-        <div>
-          <span className="section-kicker">{label ? `${label} 사주` : '사주 한눈에'}</span>
-          <h2 className="brief-title">{b.title}</h2>
-        </div>
-        {compact ? null : <PillarTable base={saju.base} small />}
+    <section className="card saju-panel" aria-label={`${label ?? ''} 만세력`}>
+      <div className="sp-head">
+        <span className="section-kicker">{label ? `${label} 만세력` : '만세력'}</span>
+        <h2 className="sp-title">{b.title}</h2>
+        <p className="sp-when num">
+          {when} · {ZODIAC_KO[saju.primary.pillars.year.branch]}띠
+        </p>
       </div>
-      <dl className="brief-rows">
-        <div>
-          <dt>이름에 담을 기운</dt>
-          <dd>{chips(b.need, 'chip-primary')}</dd>
-        </div>
-        {b.many.length ? (
-          <div>
-            <dt>많은 기운</dt>
-            <dd>{chips(b.many, '')}</dd>
-          </div>
-        ) : null}
-        {!compact && b.few.length ? (
-          <div>
-            <dt>부족한 기운</dt>
-            <dd>{chips(b.few, '')}</dd>
-          </div>
-        ) : null}
-      </dl>
-      <Link className="more-link" to={detailTo}>
-        사주 자세히 보기 {Icon.chevron}
-      </Link>
+      <PillarTable base={base} big />
+      <div className="stack" style={{ gap: 8 }}>
+        {sajuEval(saju).map((r) => (
+          <SajuEvalRow key={r.key} r={r} power={r.key === 'balance' ? saju.primary.power : null} />
+        ))}
+      </div>
     </section>
+  );
+}
+
+function SajuEvalRow({ r, power }: { r: SajuRow; power: Record<Element, number> | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <article className={`crit-row sub ${open ? 'open' : ''}`}>
+      <button type="button" className="crit-sum" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={`vdot ${r.verdict ?? 'need'}`} aria-hidden="true" />
+        <span className="cr-text">
+          <b>{r.title}</b>
+          <span>{r.summary}</span>
+        </span>
+        {r.verdict ? <span className={`verdict ${VERDICT_CLS[r.verdict]}`}>{r.verdictText}</span> : null}
+        <span className="cr-chev" aria-hidden="true">
+          {Icon.down}
+        </span>
+      </button>
+      {open ? (
+        <div className="crit-detail">
+          {power ? <ElementBars power={power} wanted={[]} avoid={[]} /> : null}
+          {!power ? (
+            <ul className="plain-list">
+              {r.detail.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -240,7 +255,7 @@ function FixOptions({ c, report, better, cur, hasSaju, recommendTo }: { c: Crite
                 {b.hanja} <span className="muted">같은 소리</span>
               </b>
               <span>
-                {meaning} · {c.title} {b.report.score[field]}/{c.max} · 총 {b.report.score.total}점
+                {meaning} · {c.title} {Math.round(b.report.score[field])}/{c.max} · 총 {Math.round(b.report.score.total)}점
               </span>
               {Icon.chevron}
             </Link>
@@ -271,7 +286,7 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
           <span className={`verdict ${VERDICT_CLS[c.verdict]}`}>{c.verdictText}</span>
           {c.score !== null ? (
             <span className="cr-score num">
-              {c.score}
+              {Math.round(c.score)}
               <small>/{c.max}</small>
             </span>
           ) : null}
@@ -288,6 +303,16 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
       {open ? (
         <div className="crit-detail">
           <p className="crit-why">{c.why}</p>
+          {c.table ? (
+            <dl className="mini-table">
+              {c.table.map((t) => (
+                <div key={t.label}>
+                  <dt>{t.label}</dt>
+                  <dd className={t.tone}>{t.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           {c.pros.length ? (
             <ul className="pc pros" aria-label="좋은 점">
               {c.pros.map((t, i) => (
@@ -367,36 +392,41 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
         };
     return `/results?${toQuery(base)}&fix=${k}`;
   };
-  const sajuTo = `/saju?${query}`;
 
+  const canBack = Boolean(nav.from) || window.history.length > 1;
   return (
     <div className="report stack-lg">
-      {nav.from ? (
-        <button type="button" className="back-link" onClick={() => navigate(-1)}>
-          {Icon.back} 추천 목록으로
-        </button>
-      ) : null}
+      <div className="topbar">
+        {canBack ? (
+          <button type="button" className="icon-btn back-btn" aria-label="돌아가기" onClick={() => navigate(-1)}>
+            {Icon.back}
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className="topbar-actions">
+          <Link className="btn btn-outline btn-sm" to={`/self?${query}`}>
+            한자 바꿔 보기
+          </Link>
+          <button type="button" className="icon-btn" aria-pressed={saved} aria-label={saved ? '저장 해제' : '저장'} onClick={() => (lib.user ? lib.toggleBookmark(entry) : gate.openLogin())}>
+            {Icon.bookmark(saved)}
+          </button>
+          <button type="button" className="icon-btn" aria-label="공유하기" onClick={share}>
+            {Icon.share}
+          </button>
+        </div>
+      </div>
+      {copied ? <p className="small muted" style={{ marginTop: -16 }}>링크를 복사했어요</p> : null}
 
       <section className="card hero-card">
-        <div className="hc-main">
-          <NameHero report={report} />
-          <div className="hc-actions">
-            <button type="button" className="icon-btn" aria-pressed={saved} aria-label={saved ? '북마크 해제' : '북마크'} onClick={() => (lib.user ? lib.toggleBookmark(entry) : gate.openLogin())}>
-              {Icon.bookmark(saved)}
-            </button>
-            <button type="button" className="icon-btn" aria-label="공유하기" onClick={share}>
-              {Icon.share}
-            </button>
-          </div>
-        </div>
+        <NameHero report={report} />
         <div className="hc-score">
           {nav.rank ? <span className="rank-badge">추천 {nav.rank}위</span> : null}
           <b className="big-score">
-            <CountUp value={report.score.total} />
+            <CountUp value={Math.round(report.score.total)} />
             <small>점</small>
           </b>
           <span className={`grade-pill lg g-${report.score.grade}`}>{report.score.grade}등급</span>
-          {copied ? <span className="small muted">링크를 복사했어요</span> : null}
         </div>
       </section>
 
@@ -431,10 +461,12 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
         {!lib.user ? <p className="tiny muted">로그인하지 않아 이 결과는 저장되지 않아요.</p> : null}
       </section>
 
-      <section className="stack" style={{ gap: 12 }} aria-label="항목별 풀이">
+      {saju ? <SajuPanel saju={saju} /> : null}
+
+      <section className="stack" style={{ gap: 10 }} aria-label="항목별 풀이">
         <div className="between">
           <h2>항목별 풀이</h2>
-          <span className="small muted">눌러서 자세히 보기</span>
+          <span className="small muted">눌러서 자세히</span>
         </div>
         {criteria.map((c) => (
           <CriterionRow key={c.key} c={c}>
@@ -443,10 +475,8 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
         ))}
       </section>
 
-      {saju ? <SajuBrief saju={saju} detailTo={sajuTo} /> : null}
-
       {better.length ? (
-        <section className="stack" style={{ gap: 12 }} aria-label="같은 소리 더 좋은 한자">
+        <section className="stack" style={{ gap: 10 }} aria-label="같은 소리 더 좋은 한자">
           <h2>같은 소리, 점수가 더 높은 한자</h2>
           <div className="stack" style={{ gap: 10 }}>
             {better.slice(0, 3).map((b) => (
@@ -471,7 +501,7 @@ function BetterRow({ rec, to }: { rec: Recommendation; to: string }) {
         <span className="nc-meaning">{meaning}</span>
       </span>
       <span className="nc-score">
-        <b className="num">{rec.report.score.total}</b>
+        <b className="num">{Math.round(rec.report.score.total)}</b>
         <span className={`grade-pill g-${rec.report.score.grade}`}>{rec.report.score.grade}등급</span>
       </span>
     </Link>

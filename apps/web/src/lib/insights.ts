@@ -1,4 +1,4 @@
-import type { NameReport, SajuAnalysis } from '@aidam/engine';
+import type { NameReport, SajuAnalysis, SajuResult } from '@aidam/engine';
 import { ELEMENT_HANJA, type Element } from '@aidam/engine/src/core/elements';
 import { FRAME_KO } from '@aidam/engine/src/name/suri';
 import { SCHOOL_KO } from '@aidam/engine/src/name/sound';
@@ -307,6 +307,8 @@ export interface Criterion {
   max: number;
   /** 한 줄 요약 (목록·총평용) */
   summary: string;
+  /** 학설별 비교 등 짧은 표 */
+  table?: { label: string; value: string; tone: Verdict }[];
 }
 
 const verdictOf = (ratio: number | null): Verdict => (ratio === null ? 'ok' : ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'ok' : 'bad');
@@ -374,14 +376,18 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       else cons.push(`${from} → ${to}: ${CTRL_STORY[p.from]} 앞소리가 뒷소리를 눌러요. 부를 때 기운이 끊긴다고 봐요.`);
     });
     if (flow.pairs.length && !flow.pairs.some((p) => p.kind === 'clash')) pros.push('서로 누르는 소리(상극)가 하나도 없어서 좋아요.');
-    const other = school === 'haerye' ? 'unhae' : 'haerye';
-    if (report.soundBySchool[other].pairs.some((p) => p.kind === 'clash') && !flow.pairs.some((p) => p.kind === 'clash')) {
-      cons.push(`다른 학설(${other === 'unhae' ? '운해본' : '해례본'})로 보면 부딪히는 곳이 있어요. 학설에 따라 달라지는 부분이에요.`);
-    }
+    const schoolRow = (sc: 'haerye' | 'unhae') => {
+      const f = report.soundBySchool[sc];
+      const chain = f.elements.map((e, i) => `${syl[i] ?? ''}(${e ? PLAIN[e] : '?'})`).join(' → ');
+      const clash = f.pairs.some((p) => p.kind === 'clash');
+      return { label: sc === 'haerye' ? '해례본' : '운해본', value: `${chain} · ${clash ? '부딪히는 곳 있음' : '잘 어울림'}`, tone: (clash ? 'bad' : 'good') as Verdict };
+    };
+    const table = [schoolRow('haerye'), schoolRow('unhae')];
     out.push({
+      table,
       key: 'sound',
       title: '부를 때 소리가 어울리나요',
-      why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. (${known.map((e) => PLAIN[e]).join(' → ')})`,
+      why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. 학설이 둘(해례본·운해본)이라 둘 다 보여 드려요. 점수는 해례본 기준이에요.${known.length ? '' : ''}`,
       verdict: verdictOf(s.sound / 20),
       verdictText: VERDICT_TEXT[verdictOf(s.sound / 20)],
       pros,
@@ -495,9 +501,12 @@ function criterionSummary(c: Criterion, report: NameReport, a: SajuAnalysis | nu
       return fill.length ? `필요한 ${fill.join('·')} 기운을 조금 채워요` : '필요한 기운을 채우지 못해요';
     }
     case 'sound': {
-      const flow = report.soundBySchool[report.options.soundSchool];
-      if (flow.pairs.some((p) => p.kind === 'clash')) return '서로 누르는 소리가 있어요';
-      return c.verdict === 'good' ? '소리가 서로 살려 줘요' : '소리 흐름이 무난해요';
+      const h = report.soundBySchool.haerye.pairs.some((p) => p.kind === 'clash');
+      const u = report.soundBySchool.unhae.pairs.some((p) => p.kind === 'clash');
+      if (h && u) return '두 학설 모두 부딪히는 소리가 있어요';
+      if (h) return '해례본으로 보면 부딪히는 소리가 있어요';
+      if (u) return '해례본은 좋고, 운해본은 부딪혀요';
+      return c.verdict === 'good' ? '두 학설 모두 소리가 잘 어울려요' : '소리 흐름이 무난해요';
     }
     case 'suri': {
       if (!report.frames) return '한자를 고르면 볼 수 있어요';
@@ -538,4 +547,79 @@ export function sajuBrief(a: SajuAnalysis): { title: string; need: Element[]; ma
     many: ORDER.filter((e) => a.power[e] >= 30),
     few: ORDER.filter((e) => a.counts[e] === 0 || a.power[e] < 10),
   };
+}
+
+
+// ── 만세력 평가: 한눈에 보는 세 가지 + 펼쳐 보기 ─────────────────
+export interface SajuRow {
+  key: 'strength' | 'balance' | 'need' | 'boundary';
+  title: string;
+  summary: string;
+  verdict: Verdict | null;
+  verdictText: string;
+  detail: string[];
+}
+
+const STRENGTH_SHORT = { veryWeak: '아주 여린 편', weak: '여린 편', balanced: '고르게 잡힌 편', strong: '센 편', veryStrong: '아주 센 편' } as const;
+
+export function sajuEval(saju: SajuResult): SajuRow[] {
+  const a = saju.primary;
+  const rows: SajuRow[] = [];
+  const lv = a.strength.level;
+  const sv: Verdict = lv === 'balanced' ? 'good' : lv === 'veryWeak' || lv === 'veryStrong' ? 'bad' : 'ok';
+  rows.push({
+    key: 'strength',
+    title: '타고난 힘',
+    summary: `${STRENGTH_SHORT[lv]}이에요 (나를 돕는 기운 ${Math.round(a.strength.ratio * 100)}%)`,
+    verdict: sv,
+    verdictText: sv === 'good' ? '균형' : lv === 'strong' || lv === 'veryStrong' ? '강함' : '약함',
+    detail: [
+      `태어난 날의 기운(${WORD[a.dayMaster]})을 돕는 기운과 힘을 빼는 기운을 견주어 봐요.`,
+      lv === 'balanced'
+        ? '양쪽이 비슷해 균형이 잡힌 사주예요.'
+        : lv === 'strong' || lv === 'veryStrong'
+          ? '돕는 기운이 많아 힘이 넘치는 사주예요. 그 힘을 덜어 주는 기운이 이름에 있으면 좋아요.'
+          : '돕는 기운이 적어 힘이 여린 사주예요. 받쳐 주는 기운이 이름에 있으면 좋아요.',
+    ].map(tidy),
+  });
+  const few = ORDER.filter((e) => a.counts[e] === 0);
+  const many = ORDER.filter((e) => a.power[e] >= 30);
+  const bv: Verdict = few.length === 0 && many.length === 0 ? 'good' : few.length >= 2 || many.some((e) => a.power[e] >= 45) ? 'bad' : 'ok';
+  rows.push({
+    key: 'balance',
+    title: '다섯 기운의 균형',
+    summary:
+      many.length && few.length
+        ? `${many.map((e) => WORD[e]).join('·')} 기운이 많고, ${few.map((e) => WORD[e]).join('·')} 기운이 없어요`
+        : many.length
+          ? `${many.map((e) => WORD[e]).join('·')} 기운이 많아요`
+          : few.length
+            ? `${few.map((e) => WORD[e]).join('·')} 기운이 없어요`
+            : '다섯 기운이 고루 있어요',
+    verdict: bv,
+    verdictText: bv === 'good' ? '고름' : bv === 'ok' ? '조금 치우침' : '치우침',
+    detail: ORDER.map((e) => `${el(e)} ${Math.round(a.power[e])}%${a.counts[e] === 0 ? ' · 사주에 없음' : a.power[e] >= 30 ? ' · 많음' : ''}`),
+  });
+  rows.push({
+    key: 'need',
+    title: '이름에 담을 기운',
+    summary: `${el(a.yongsin)}${a.huisin !== a.yongsin ? ` · ${el(a.huisin)}` : ''}`,
+    verdict: null,
+    verdictText: '',
+    detail: [sajuNarrative(a), ...(ORDER.some((e) => a.roles[e] === 'gi') ? [`${ORDER.filter((e) => a.roles[e] === 'gi' || a.roles[e] === 'gu').map(el).join(', ')} 기운은 이름에 넣지 않는 게 좋아요.`] : [])].map(tidy),
+  });
+  if (saju.alternatives.length || saju.unknownTime) {
+    const differs = saju.alternatives.some((x) => x.analysis.yongsin !== a.yongsin);
+    rows.push({
+      key: 'boundary',
+      title: '태어난 시각',
+      summary: saju.unknownTime ? '시각을 몰라 열두 때를 모두 따졌어요' : differs ? '경계에 가까워 결과가 달라질 수 있어요' : '경계에 가깝지만 필요한 기운은 같아요',
+      verdict: saju.unknownTime || differs ? 'ok' : 'good',
+      verdictText: saju.unknownTime ? '시간 모름' : differs ? '확인 필요' : '안정',
+      detail: saju.unknownTime
+        ? [`가장 많이 나온 결과를 썼어요(일치 ${Math.round(saju.unknownTime.confidence * 100)}%).`]
+        : saju.alternatives.map((x) => `${x.label}: 필요한 기운 ${el(x.analysis.yongsin)}`),
+    });
+  }
+  return rows;
 }

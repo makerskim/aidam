@@ -17,6 +17,7 @@ import {
   SURNAMES,
   surnameStrokes,
   type BirthInput,
+  type Recommendation,
   type SajuOptions,
 } from '@aidam/engine';
 import { FAMILIAR_HANJA } from '@aidam/engine/src/recommend/syllables';
@@ -66,17 +67,42 @@ export const api = {
     }));
     const sajus = children.map((c) => (c.birth ? computeSaju(c.birth, state.sajuOpts) : null));
     const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 10);
-    return { sajus, sets };
+    const sameSaju = sajus.length > 1 && sajus.every((s) => s && JSON.stringify(s.base.pillars) === JSON.stringify(sajus[0]?.base.pillars));
+    return { sajus, sets, sameSaju };
   },
-  /** 다둥이를 아이마다 따로: 아이별 사주로 각각 추천 */
+  /**
+   * 다둥이를 아이마다 따로: 아이별 사주로 각각 추천하되, 같은 이름이 두 아이에게 겹치지 않게 나눈다.
+   * 사주·성별이 같으면 추천 목록도 같으므로, 아이들이 차례를 바꿔 가며 자기 순위가 가장 높은
+   * 남은 이름을 하나씩 가져간다(드래프트). 결과는 언제나 같다.
+   */
   recommendEach(state: NameState) {
     const kids = state.kids ?? [];
-    return kids.map((k, i) => {
+    const raw = kids.map((k, i) => {
       const birth = state.birth ? { ...state.birth, time: k.time } : null;
       const saju = birth ? computeSaju(birth, state.sajuOpts) : null;
       const recs = recommendNames({ surname: surnameChars(state.surname), gender: k.gender, saju: saju?.primary ?? null, prefs: state.prefs, options: state.school, limit: 100 });
       return { label: KID_LABELS[i] ?? `${i + 1}`, gender: k.gender, saju, recs };
     });
+    const key = (r: { hangul: string }) => r.hangul;
+    const taken = new Set<string>();
+    const picked: Recommendation[][] = raw.map(() => []);
+    const cursor = raw.map(() => 0);
+    const n = raw.length;
+    for (let round = 0; picked.some((p, i) => cursor[i]! < (raw[i]?.recs.length ?? 0)); round++) {
+      for (let t = 0; t < n; t++) {
+        const i = (round + t) % n;
+        const list = raw[i]!.recs;
+        while (cursor[i]! < list.length && taken.has(key(list[cursor[i]!]!))) cursor[i]! += 1;
+        const rec = list[cursor[i]!];
+        if (!rec) continue;
+        cursor[i]! += 1;
+        taken.add(key(rec));
+        picked[i]!.push(rec);
+      }
+    }
+    const pillarsOf = (s: (typeof raw)[number]['saju']) => (s ? JSON.stringify(s.base.pillars) : '');
+    const sameSaju = n > 1 && raw.every((k) => k.saju && pillarsOf(k.saju) === pillarsOf(raw[0]!.saju));
+    return { sameSaju, kids: raw.map((k, i) => ({ ...k, recs: picked[i] ?? [] })) };
   },
   analyze(state: AnalyzeState) {
     const saju = state.birth ? computeSaju(state.birth, state.sajuOpts) : null;

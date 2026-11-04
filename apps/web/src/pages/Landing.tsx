@@ -2,9 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useGate } from '../lib/gate';
 import { useReveal } from '../lib/motion';
 
-/** 히어로에서 천천히 바뀌는 한 줄 */
-const LINES = ['불릴 때마다, 좋은 기운이 닿도록', '태어난 순간의 빛을 이름에 담아요', '평생 함께할 첫 번째 선물'];
-
 const STEPS = [
   { n: '01', title: '태어난 순간', text: '만세력으로 사주를 세워요' },
   { n: '02', title: '필요한 기운', text: '모자란 기운을 찾아요' },
@@ -30,7 +27,6 @@ const FLOATS: [string, number, number, number, string][] = [
   ['愛', 86, 70, 1.3, 'el-wood'],
 ];
 
-const STEP_MS = 3800;
 const reduced = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const Arrow = (
@@ -95,20 +91,11 @@ export function Landing() {
   const gate = useGate();
   const root = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLElement>(null);
-  const showRef = useRef<HTMLDivElement>(null);
   useReveal(root);
   const start = () => gate.go('/name', true);
   const check = () => gate.go('/name?check=1', true);
 
-  // 바뀌는 한 줄
-  const [line, setLine] = useState(0);
-  useEffect(() => {
-    if (reduced()) return;
-    const id = window.setInterval(() => setLine((l) => (l + 1) % LINES.length), 3200);
-    return () => window.clearInterval(id);
-  }, []);
-
-  // 스크롤하면 브랜드가 작아지며 물러나고, 떠다니는 글자는 깊이에 따라 다르게 움직인다
+  // 스크롤하면 떠다니는 글자가 깊이에 따라 다르게 움직인다(브랜드는 고정)
   useEffect(() => {
     const el = heroRef.current;
     if (!el || reduced()) return;
@@ -128,26 +115,42 @@ export function Landing() {
     };
   }, []);
 
-  // 세 단계는 화면에 보이면 저절로 넘어간다(누르면 그 단계로)
-  const [cur, setCur] = useState(0);
-  const [tick, setTick] = useState(0);
-  const [visible, setVisible] = useState(false);
+  // 스크롤 스토리: 그림 한가운데와 가장 가까운 단계가 켜진다(그림과 글이 같은 높이에서 바뀜)
+  const storyRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
   useEffect(() => {
-    const el = showRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(([e]) => setVisible(Boolean(e?.isIntersecting)), { threshold: 0.35 });
-    io.observe(el);
-    return () => io.disconnect();
+    const root = storyRef.current;
+    if (!root) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const visual = root.querySelector<HTMLElement>('.story-visual');
+        const steps = [...root.querySelectorAll<HTMLElement>('.story-step')];
+        const v = visual && getComputedStyle(visual).display !== 'none' ? visual.getBoundingClientRect() : null;
+        const target = v ? v.top + v.height / 2 : window.innerHeight / 2;
+        let best = 0;
+        let dist = Infinity;
+        steps.forEach((st, k) => {
+          const r = st.getBoundingClientRect();
+          const d = Math.abs(r.top + r.height / 2 - target);
+          if (d < dist) {
+            dist = d;
+            best = k;
+          }
+        });
+        setActive(best);
+      });
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      cancelAnimationFrame(raf);
+    };
   }, []);
-  useEffect(() => {
-    if (!visible || reduced()) return;
-    const id = window.setTimeout(() => setCur((c) => (c + 1) % STEPS.length), STEP_MS);
-    return () => window.clearTimeout(id);
-  }, [cur, visible, tick]);
-  const select = (i: number) => {
-    setCur(i);
-    setTick((t) => t + 1);
-  };
 
   return (
     <main className="landing" ref={root}>
@@ -163,18 +166,10 @@ export function Landing() {
           ))}
         </div>
         <div className="container hero-inner">
-          <h1 className="hero-brand" aria-label="아이담">
-            {['아', '이', '담'].map((c, i) => (
-              <span key={c} style={{ '--i': i } as CSSProperties} aria-hidden="true">
-                {c}
-              </span>
-            ))}
-          </h1>
+          <h1 className="hero-brand">아이담</h1>
           <span className="hero-en">AIDAM</span>
           <p className="hero-tag">아이의 이름에 의미를 담다</p>
-          <p className="hero-line" aria-live="polite">
-            <span key={line}>{LINES[line]}</span>
-          </p>
+          <p className="hero-line">불릴 때마다, 좋은 기운이 닿도록</p>
           <div className="hero-cta">
             <button type="button" className="btn btn-primary btn-lg btn-shine" onClick={start}>
               이름 짓기 {Arrow}
@@ -189,22 +184,25 @@ export function Landing() {
       <section className="band">
         <div className="container">
           <h2 className="band-title reveal">이름에 담기까지</h2>
-          <div className="show" ref={showRef}>
-            <div className="show-tabs" role="tablist" aria-label="이름이 나오는 과정">
-              {STEPS.map((s, i) => (
-                <button key={s.n} type="button" role="tab" aria-selected={cur === i} className={`show-tab reveal d${i + 1}`} onClick={() => select(i)}>
-                  <span className="n">{s.n}</span>
-                  <b>{s.title}</b>
-                  <span className="t">{s.text}</span>
-                  {cur === i ? <i className={`prog ${visible ? 'run' : ''}`} key={`${cur}-${tick}-${visible}`} style={{ animationDuration: `${STEP_MS}ms` }} /> : null}
-                </button>
-              ))}
-            </div>
-            <div className="show-visual reveal d2" aria-hidden="true">
+          <div className="story" ref={storyRef}>
+            <div className="story-visual" aria-hidden="true">
               <span className="example-tag">예시</span>
               {STEPS.map((_, i) => (
-                <div key={i} className={cur === i ? 'on' : ''}>
-                  {cur === i ? <Visual i={i} /> : null}
+                <div key={i} className={active === i ? 'on' : ''}>
+                  {active === i ? <Visual i={i} /> : null}
+                </div>
+              ))}
+            </div>
+            <div className="story-steps">
+              {STEPS.map((st, i) => (
+                <div key={st.n} className={`story-step ${active === i ? 'on' : ''}`}>
+                  <span className="n">{st.n}</span>
+                  <h3>{st.title}</h3>
+                  <p>{st.text}</p>
+                  <div className="story-inline" aria-hidden="true">
+                    <span className="example-tag">예시</span>
+                    <Visual i={i} />
+                  </div>
                 </div>
               ))}
             </div>
