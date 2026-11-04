@@ -38,6 +38,26 @@ Made by makerskim
 
 ---
 
+## 무료로 계속 운영하기: Cloudflare Pages로 옮기기 (추천)
+
+Netlify 무료 요금제는 배포 1번에 15크레딧(월 300)을 써서, 자주 고치면 한도가 금방 찹니다(넘어도 요금은 없고 사이트가 멈춤). Cloudflare Pages는 무료로 정적 사이트의 방문자 트래픽에 제한·요금이 없고, 한 달에 빌드 500번까지 무료라 이 사이트에 더 잘 맞습니다.
+
+1. **https://dash.cloudflare.com/sign-up** 에서 무료로 가입합니다(이메일 인증).
+2. 왼쪽 메뉴 **Workers & Pages** → **Create** → **Pages** 탭 → **Connect to Git**를 누릅니다.
+3. **GitHub** 연결을 허용하고(비공개 저장소도 됨), 저장소 목록에서 **aidam**을 고른 뒤 **Begin setup**을 누릅니다.
+4. 설정 화면에 아래처럼 넣습니다.
+   - Framework preset: **None**
+   - Build command: `pnpm test && pnpm build`
+   - Build output directory: `apps/web/dist`
+   - **Environment variables**에 두 개 추가: `NODE_VERSION` = `22`, `PNPM_VERSION` = `10.12.1`
+5. **Save and Deploy**를 누르고 2~3분 기다리면 `https://aidam-xxx.pages.dev` 주소가 생깁니다.
+6. Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 새 주소(`aidam-xxx.pages.dev`)를 추가합니다(구글 로그인용).
+7. 잘 되면 Netlify 사이트는 지워도 됩니다(Site configuration → Delete site). 그 뒤로는 GitHub에 올릴 때마다 Cloudflare가 무료로 자동 배포합니다.
+
+보안 헤더는 `apps/web/public/_headers` 파일에 있어 두 곳 모두에서 그대로 적용됩니다.
+
+---
+
 ## Google 로그인 켜기 (Firebase, 무료)
 
 로그인 없이도 이 기기에 기록·북마크가 저장됩니다. 계정에 저장하려면 아래를 한 번만 하면 됩니다.

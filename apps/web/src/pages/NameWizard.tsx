@@ -201,7 +201,7 @@ export function NameWizard() {
 
   const [title, sub] = COPY[draft.step];
   const isLast = index === flow.length - 1 || (draft.purpose === 'check' && draft.step === 'birth');
-  // 타일을 누르면 바로 넘어가지만, 모든 단계에 '다음' 버튼도 둔다
+  // 타일은 고르기만 하고, 넘어가기는 언제나 '다음' 버튼으로
   const autoStep = false;
   const ctaLabel = isLast ? (draft.purpose === 'check' ? '풀이 보기' : multi ? '이름 추천받기' : '이름 추천받기') : '다음';
 
@@ -229,11 +229,11 @@ export function NameWizard() {
 
         {draft.step === 'purpose' ? (
           <div className="tiles" role="group" aria-label="할 일">
-            <button type="button" className="tile" aria-pressed={draft.purpose === 'new'} onClick={() => goNext({ purpose: 'new' })}>
+            <button type="button" className="tile" aria-pressed={draft.purpose === 'new'} onClick={() => setDraft({ purpose: 'new' })}>
               새 이름 추천받기
               <small>사주에 맞는 이름을 지어 드려요</small>
             </button>
-            <button type="button" className="tile" aria-pressed={draft.purpose === 'check'} onClick={() => goNext({ purpose: 'check' })}>
+            <button type="button" className="tile" aria-pressed={draft.purpose === 'check'} onClick={() => setDraft({ purpose: 'check' })}>
               정한 이름 풀어보기
               <small>생각해 둔 이름이 잘 맞는지 봐 드려요</small>
             </button>
@@ -281,7 +281,7 @@ export function NameWizard() {
                   [3, '세쌍둥이'],
                 ] as const
               ).map(([n, label]) => (
-                <button key={n} type="button" className="tile" aria-pressed={draft.count === n} onClick={() => (n === 1 ? goNext({ count: 1 }) : setDraft({ count: n }))}>
+                <button key={n} type="button" className="tile" aria-pressed={draft.count === n} onClick={() => setDraft({ count: n })}>
                   {label}
                 </button>
               ))}
@@ -311,7 +311,7 @@ export function NameWizard() {
                 ['unknown', '아직 몰라요'],
               ] as const
             ).map(([v, label]) => (
-              <button key={v} type="button" className="tile" aria-pressed={draft.gender === v} onClick={() => goNext({ gender: v })}>
+              <button key={v} type="button" className="tile" aria-pressed={draft.gender === v} onClick={() => setDraft({ gender: v })}>
                 {label}
               </button>
             ))}
