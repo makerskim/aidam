@@ -23,7 +23,8 @@ async function birth(p, prefix, date, time) {
 await page.goto(`${BASE}/`);
 assert.equal(await page.locator('.hero-brand').textContent(), '아이담');
 assert.ok(await page.locator('text=AIDAM').count());
-assert.ok(await page.locator('.hero >> text=정한 이름 풀어보기').count(), '정한 이름 풀어보기 버튼 없음');
+assert.ok(await page.locator('.hero >> text=이름 풀이').count(), '이름 풀이 버튼 없음');
+assert.ok(await page.locator('.show-tab').count() === 3, '세 단계 소개 없음');
 assert.ok(await page.locator('.example-tag').count(), '예시 표시 없음');
 assert.ok(await page.locator('text=Made by makerskim').count(), '만든 사람 표기 없음');
 await page.click('text=작명 원리와 출처 보기');
@@ -55,6 +56,22 @@ assert.ok(await page.locator('.df-hint:has-text("토요일")').count(), '요일 
 await page.click('button[aria-label="달력에서 고르기"]');
 await page.click('[aria-label="2026년 3월 15일"]');
 assert.equal(await page.inputValue('#baby-date'), '2026.03.15', '달력에서 고르기');
+// 달력: 제목 → 연도 → 월 → 날짜
+await page.click('button[aria-label="달력에서 고르기"]');
+await page.click('.cal-title');
+await page.click('.cal-cell:has-text("2025")');
+await page.click('.cal-cell:has-text("7월")');
+await page.click('[aria-label="2025년 7월 7일"]');
+assert.equal(await page.inputValue('#baby-date'), '2025.07.07', '연도·월 격자로 고르기');
+// 시각: 오후 3시 15분 → +1분
+await page.click('button[aria-label="시각 고르기"]');
+await page.click('.tp2-ampm button:has-text("오후")');
+await page.locator('.tp2-grid').first().locator('button', { hasText: /^3$/ }).click();
+await page.locator('.tp2-grid').nth(1).locator('button', { hasText: /^15$/ }).click();
+await page.click('button[aria-label="1분 늦게"]');
+await page.click('.tp2-done');
+assert.equal(await page.inputValue('#baby-time'), '15:16', '시각 고르기');
+await page.fill('#baby-time', '0930');
 await page.fill('#baby-date', '2026.3.14');
 await page.click('#baby-place');
 await page.locator('.pk-pop .pk-opt', { hasText: '부산' }).click();

@@ -210,7 +210,7 @@ export function DateField({
   );
 }
 
-const YEAR_OPTIONS = Array.from({ length: 201 }, (_, i) => 2100 - i);
+type CalMode = 'day' | 'month' | 'year';
 
 function CalendarPop({
   calendar,
@@ -226,77 +226,107 @@ function CalendarPop({
   onPick: (v: { y: number; m: number; d: number }) => void;
 }) {
   const [view, setView] = useState({ y: Math.min(2100, Math.max(1900, year)), m: Math.min(12, Math.max(1, month)) });
+  const [mode, setMode] = useState<CalMode>('day');
+  const [dir, setDir] = useState<'next' | 'prev' | ''>('');
+  const yearPage = Math.floor((view.y - 1900) / 12) * 12 + 1900;
   const move = (delta: number) => {
+    setDir(delta > 0 ? 'next' : 'prev');
+    if (mode === 'year') return setView((v) => ({ ...v, y: Math.min(2100, Math.max(1900, v.y + delta * 12)) }));
+    if (mode === 'month') return setView((v) => ({ ...v, y: Math.min(2100, Math.max(1900, v.y + delta)) }));
     const idx = view.y * 12 + (view.m - 1) + delta;
     const y = Math.floor(idx / 12);
-    if (y < 1900 || y > 2100) return;
-    setView({ y, m: (idx % 12) + 1 });
+    if (y < 1900 || y > 2100) return undefined;
+    return setView({ y, m: (idx % 12) + 1 });
   };
   const solar = calendar === 'solar';
   const days = solar ? new Date(Date.UTC(view.y, view.m, 0)).getUTCDate() : 30;
   const lead = solar ? new Date(Date.UTC(view.y, view.m - 1, 1)).getUTCDay() : 0;
   const now = new Date();
   const isToday = (d: number) => solar && now.getFullYear() === view.y && now.getMonth() + 1 === view.m && now.getDate() === d;
+  const title = mode === 'year' ? `${yearPage} – ${Math.min(2100, yearPage + 11)}` : mode === 'month' ? `${view.y}년` : `${view.y}년 ${view.m}월`;
   return (
     <div className="pk-pop cal" role="dialog" aria-label={`${solar ? '양력' : '음력'} 달력`}>
       <div className="cal-head">
-        <button type="button" className="cal-nav" aria-label="이전 달" onClick={() => move(-1)}>
-          {Icon.back}
+        <button type="button" className="cal-title" aria-label="연도·월 고르기" onClick={() => setMode(mode === 'day' ? 'year' : mode === 'year' ? 'month' : 'day')}>
+          {!solar ? <span className="cal-lunar">음력</span> : null}
+          {title}
+          <span className={`cal-caret ${mode !== 'day' ? 'up' : ''}`}>{Icon.down}</span>
         </button>
-        <div className="cal-selects">
-          <select aria-label="연도" value={view.y} onChange={(e) => setView({ ...view, y: Number(e.target.value) })}>
-            {YEAR_OPTIONS.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
-          <select aria-label="월" value={view.m} onChange={(e) => setView({ ...view, m: Number(e.target.value) })}>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {m}월
-              </option>
-            ))}
-          </select>
+        <div className="cal-navs">
+          <button type="button" className="cal-nav" aria-label={mode === 'day' ? '이전 달' : '이전'} onClick={() => move(-1)}>
+            {Icon.back}
+          </button>
+          <button type="button" className="cal-nav next" aria-label={mode === 'day' ? '다음 달' : '다음'} onClick={() => move(1)}>
+            {Icon.back}
+          </button>
         </div>
-        <button type="button" className="cal-nav next" aria-label="다음 달" onClick={() => move(1)}>
-          {Icon.back}
-        </button>
       </div>
-      {solar ? (
-        <div className="cal-grid cal-week" aria-hidden="true">
-          {WEEK.map((w, i) => (
-            <span key={w} className={i === 0 ? 'sun' : i === 6 ? 'sat' : ''}>
-              {w}
-            </span>
+
+      {mode === 'year' ? (
+        <div className={`cal-cells cal-ym slide-${dir}`} key={`y${yearPage}`}>
+          {Array.from({ length: 12 }, (_, k) => yearPage + k)
+            .filter((y) => y <= 2100)
+            .map((y) => (
+              <button key={y} type="button" className={`cal-cell ${now.getFullYear() === y ? 'today' : ''}`} aria-pressed={view.y === y} onClick={() => { setView({ ...view, y }); setMode('month'); setDir(''); }}>
+                {y}
+              </button>
+            ))}
+        </div>
+      ) : null}
+
+      {mode === 'month' ? (
+        <div className={`cal-cells cal-ym slide-${dir}`} key={`m${view.y}`}>
+          {Array.from({ length: 12 }, (_, k) => k + 1).map((m) => (
+            <button key={m} type="button" className="cal-cell" aria-pressed={view.m === m} onClick={() => { setView({ ...view, m }); setMode('day'); setDir(''); }}>
+              {m}월
+            </button>
           ))}
         </div>
-      ) : (
-        <p className="tiny muted" style={{ margin: '0 4px 8px' }}>
-          음력 날짜를 골라 주세요. 윤달은 아래에서 따로 켜요.
-        </p>
-      )}
-      <div className="cal-grid">
-        {Array.from({ length: lead }, (_, i) => (
-          <span key={`b${i}`} />
-        ))}
-        {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
-          const sel = selected && selected.y === view.y && selected.m === view.m && selected.d === d;
-          const dow = (lead + d - 1) % 7;
-          return (
-            <button
-              key={d}
-              type="button"
-              className={`cal-day ${isToday(d) ? 'today' : ''} ${solar && dow === 0 ? 'sun' : ''} ${solar && dow === 6 ? 'sat' : ''}`}
-              aria-pressed={Boolean(sel)}
-              aria-label={`${view.y}년 ${view.m}월 ${d}일`}
-              onClick={() => onPick({ y: view.y, m: view.m, d })}
-            >
-              {d}
-            </button>
-          );
-        })}
-      </div>
+      ) : null}
+
+      {mode === 'day' ? (
+        <>
+          {solar ? (
+            <div className="cal-grid cal-week" aria-hidden="true">
+              {WEEK.map((w, k) => (
+                <span key={w} className={k === 0 ? 'sun' : k === 6 ? 'sat' : ''}>
+                  {w}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className={`cal-grid slide-${dir}`} key={`d${view.y}-${view.m}`}>
+            {Array.from({ length: lead }, (_, k) => (
+              <span key={`b${k}`} />
+            ))}
+            {Array.from({ length: days }, (_, k) => k + 1).map((d) => {
+              const sel = selected && selected.y === view.y && selected.m === view.m && selected.d === d;
+              const dow = (lead + d - 1) % 7;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  className={`cal-day ${isToday(d) ? 'today' : ''} ${solar && dow === 0 ? 'sun' : ''} ${solar && dow === 6 ? 'sat' : ''}`}
+                  aria-pressed={Boolean(sel)}
+                  aria-label={`${view.y}년 ${view.m}월 ${d}일`}
+                  onClick={() => onPick({ y: view.y, m: view.m, d })}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          {solar ? (
+            <div className="cal-foot">
+              <button type="button" className="cal-today" onClick={() => onPick({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() })}>
+                오늘
+              </button>
+            </div>
+          ) : (
+            <p className="tiny muted cal-note">윤달이면 아래 ‘윤달이에요’를 켜 주세요.</p>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -325,6 +355,70 @@ function formatTimeTyping(raw: string): string {
 }
 const ampm = (h: number) => (h < 12 ? '오전' : '오후');
 
+/** 오전/오후 + 시(12칸) + 분(5분 칸) + ±1분 */
+function TimePop({ time, onChange, onDone }: { time: string; onChange: (t: string) => void; onDone: () => void }) {
+  const [h0, m0] = time ? time.split(':').map(Number) : [9, 0];
+  const h = h0 ?? 9;
+  const m = m0 ?? 0;
+  const [pm, setPm] = useState(h >= 12);
+  const set = (hh: number, mm: number) => onChange(`${pad2(hh)}:${pad2(mm)}`);
+  const step = (delta: number) => {
+    const t = (((h * 60 + m + delta) % 1440) + 1440) % 1440;
+    setPm(t >= 720);
+    set(Math.floor(t / 60), t % 60);
+  };
+  return (
+    <div className="pk-pop tp2" role="dialog" aria-label="시각 고르기">
+      <div className="tp2-now">
+        <button type="button" className="tp2-step" aria-label="1분 빠르게" onClick={() => step(-1)}>
+          −1분
+        </button>
+        <b className="num">{time ? `${ampm(h)} ${h % 12 === 0 ? 12 : h % 12}:${pad2(m)}` : '--:--'}</b>
+        <button type="button" className="tp2-step" aria-label="1분 늦게" onClick={() => step(1)}>
+          +1분
+        </button>
+      </div>
+      <div className="seg tp2-ampm" role="group" aria-label="오전 오후">
+        {[false, true].map((isPm) => (
+          <button
+            key={String(isPm)}
+            type="button"
+            aria-pressed={pm === isPm}
+            onClick={() => {
+              setPm(isPm);
+              if (time) set((h % 12) + (isPm ? 12 : 0), m);
+            }}
+          >
+            {isPm ? '오후' : '오전'}
+          </button>
+        ))}
+      </div>
+      <div className="tp2-label">시</div>
+      <div className="tp2-grid">
+        {Array.from({ length: 12 }, (_, k) => (k === 0 ? 12 : k)).map((n) => {
+          const hh = (n % 12) + (pm ? 12 : 0);
+          return (
+            <button key={n} type="button" className="tp2-cell" aria-pressed={Boolean(time) && h === hh} onClick={() => set(hh, m)}>
+              {n}
+            </button>
+          );
+        })}
+      </div>
+      <div className="tp2-label">분</div>
+      <div className="tp2-grid">
+        {Array.from({ length: 12 }, (_, k) => k * 5).map((mm) => (
+          <button key={mm} type="button" className="tp2-cell" aria-pressed={Boolean(time) && m === mm} onClick={() => set(time ? h : pm ? 12 : 9, mm)}>
+            {pad2(mm)}
+          </button>
+        ))}
+      </div>
+      <button type="button" className="btn btn-primary btn-block tp2-done" onClick={onDone}>
+        완료
+      </button>
+    </div>
+  );
+}
+
 /** 시각: 직접 입력 + 목록에서 고르기 + 시간 모름 */
 export function TimeFields({ idPrefix, time, known, onChange }: { idPrefix: string; time: string; known: boolean; onChange: (time: string, known: boolean) => void }) {
   const [text, setText] = useState(time);
@@ -337,11 +431,6 @@ export function TimeFields({ idPrefix, time, known, onChange }: { idPrefix: stri
   }, [time]);
   const [hh, mm] = time ? time.split(':').map(Number) : [null, null];
   const hint = time && hh !== null && hh !== undefined ? `${ampm(hh)} ${hh % 12 === 0 ? 12 : hh % 12}시 ${mm}분` : '';
-  const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    listRef.current?.querySelectorAll<HTMLElement>('[aria-pressed="true"]').forEach((el) => el.scrollIntoView({ block: 'center' }));
-  }, [open]);
 
   return (
     <div className="time-row">
@@ -364,34 +453,21 @@ export function TimeFields({ idPrefix, time, known, onChange }: { idPrefix: stri
             onBlur={() => time && setText(time)}
           />
           {known && hint ? <span className="df-hint">{hint}</span> : null}
-          <button type="button" className="df-btn" aria-label="목록에서 고르기" aria-expanded={open} disabled={!known} onClick={() => setOpen((o) => !o)}>
+          <button type="button" className="df-btn" aria-label="시각 고르기" aria-expanded={open} disabled={!known} onClick={() => setOpen((o) => !o)}>
             {Icon.clock}
           </button>
         </div>
         {open ? (
           <>
             <div className="pk-backdrop" onMouseDown={() => setOpen(false)} />
-            <div className="pk-pop tp" role="dialog" aria-label="시각 고르기" ref={listRef}>
-              <div className="tp-cols">
-                <div className="tp-col" aria-label="시">
-                  <div className="tp-head">시</div>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <button key={h} type="button" className="tp-opt" aria-pressed={hh === h} onClick={() => { const t = `${pad2(h)}:${pad2(mm ?? 0)}`; setText(t); onChange(t, true); }}>
-                      <b>{pad2(h)}</b>
-                      <small>{ampm(h)}</small>
-                    </button>
-                  ))}
-                </div>
-                <div className="tp-col" aria-label="분">
-                  <div className="tp-head">분</div>
-                  {Array.from({ length: 60 }, (_, m) => (
-                    <button key={m} type="button" className="tp-opt" aria-pressed={mm === m} onClick={() => { const t = `${pad2(hh ?? 0)}:${pad2(m)}`; setText(t); onChange(t, true); setOpen(false); }}>
-                      <b>{pad2(m)}</b>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <TimePop
+              time={time}
+              onChange={(t) => {
+                setText(t);
+                onChange(t, true);
+              }}
+              onDone={() => setOpen(false)}
+            />
           </>
         ) : null}
       </div>
