@@ -2,6 +2,9 @@
 [build]
   command = "pnpm test && pnpm build && pnpm budget"
   publish = "apps/web/dist"
+  # 무료 요금제는 배포 1번에 15크레딧(월 300)을 쓴다.
+  # 사이트에 영향이 없는 변경(문서·테스트·CI 설정만 바뀜)은 빌드를 건너뛴다.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/web packages/engine/src packages/engine/package.json package.json pnpm-lock.yaml pnpm-workspace.yaml netlify.toml"
 
 [build.environment]
   NODE_VERSION = "22"
