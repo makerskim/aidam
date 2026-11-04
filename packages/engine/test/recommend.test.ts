@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recommendNames, DEFAULT_PREFERENCES } from '../src/recommend/recommend';
-import { SYLLABLES, POPULAR_NAMES, FAMILIAR_HANJA } from '../src/recommend/syllables';
+import { SYLLABLES, POPULAR_NAMES, FAMILIAR_HANJA, AWKWARD_NAMES, COMMON_NAMES, DISTINCT_NAMES } from '../src/recommend/syllables';
 import { isPositiveMeaning } from '../src/name/safety';
 import { applyDueum } from '../src/hangul/dueum';
 import { analyzeName, DEFAULT_SCHOOL_OPTIONS } from '../src/name/analyze';
@@ -88,6 +88,39 @@ describe('추천', () => {
   });
   it('사주 없이도 추천', () => {
     expect(recommendNames({ ...base, saju: null }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('어색한 이름 거르기', () => {
+  const jeong = [{ hangul: '정', hanja: '鄭' }];
+  for (const gender of ['female', 'male', 'unknown'] as const) {
+    it(`${gender}: 낱말처럼 들리는 이름(하지·지하·이유·하수…)이 없다`, () => {
+      const recs = recommendNames({ ...base, surname: jeong, gender, limit: 100 });
+      expect(recs.length).toBeGreaterThan(40);
+      for (const r of recs) expect(AWKWARD_NAMES.has(r.hangul.slice(1))).toBe(false);
+    });
+  }
+  it('이름 느낌과 상관없이 실제로 쓰는 이름 목록 안에서만 고른다', () => {
+    const known = new Set([...COMMON_NAMES.female, ...POPULAR_NAMES.female, ...DISTINCT_NAMES.female]);
+    for (const style of ['popular', 'balanced', 'unique'] as const) {
+      const recs = recommendNames({ ...base, surname: jeong, prefs: { ...DEFAULT_PREFERENCES, style }, limit: 100 });
+      expect(recs.length).toBeGreaterThan(40);
+      for (const r of recs) expect(known.has(r.hangul.slice(1))).toBe(true);
+    }
+  });
+  it('흔하지 않은 이름은 인기 이름을 덜 앞세운다', () => {
+    const top = (style: 'popular' | 'unique') =>
+      recommendNames({ ...base, surname: jeong, prefs: { ...DEFAULT_PREFERENCES, style }, limit: 100 })
+        .slice(0, 30)
+        .filter((r) => POPULAR_NAMES.female.includes(r.hangul.slice(1))).length;
+    expect(top('unique')).toBeLessThanOrEqual(top('popular'));
+  });
+  it('성과 이름 첫 글자가 같은 이름(정정우)은 없다', () => {
+    const recs = recommendNames({ ...base, surname: jeong, gender: 'male', limit: 100 });
+    for (const r of recs) expect(r.hangul[1]).not.toBe('정');
+  });
+  it('많이 쓰는 이름 목록에 낱말 이름이 섞여 있지 않다', () => {
+    for (const n of [...COMMON_NAMES.female, ...COMMON_NAMES.male]) expect(AWKWARD_NAMES.has(n)).toBe(false);
   });
 });
 

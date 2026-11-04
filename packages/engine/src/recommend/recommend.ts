@@ -10,7 +10,7 @@ import { isPositiveMeaning, teaseWord } from '../name/safety';
 import { soundFlow, vowelYinYang } from '../name/sound';
 import { strokeYinYang } from '../name/suri';
 import type { SajuAnalysis } from '../saju/analysis';
-import { FAMILIAR_HANJA, POPULAR_NAMES, SYLLABLES } from './syllables';
+import { AWKWARD_NAMES, COMMON_NAMES, DISTINCT_NAMES, FAMILIAR_HANJA, POPULAR_NAMES, SYLLABLES } from './syllables';
 
 export interface Preferences {
   /** 이름 글자 수 (성 제외) */
@@ -65,19 +65,36 @@ function preferenceOf(weights: number[], hangul: string, gender: Gender, style: 
   const norm = weights.reduce((a, b) => a + b, 0) / (weights.length * 3);
   const popular = isPopular(hangul, gender);
   if (style === 'popular') return 0.5 * norm + (popular ? 0.5 : 0);
-  if (style === 'unique') return popular ? 0.1 : 1 - 0.5 * norm;
+  if (style === 'unique') return isDistinct(hangul, gender) ? 1 : popular ? 0.1 : 0.6 - 0.3 * norm;
   return norm;
+}
+
+function isDistinct(hangul: string, gender: Gender): boolean {
+  return (gender === 'unknown' ? [...DISTINCT_NAMES.female, ...DISTINCT_NAMES.male] : DISTINCT_NAMES[gender]).includes(hangul);
 }
 
 function isPopular(hangul: string, gender: Gender): boolean {
   return (gender === 'unknown' ? [...POPULAR_NAMES.female, ...POPULAR_NAMES.male] : POPULAR_NAMES[gender]).includes(hangul);
 }
 
-/** 어색한 조합 거르기: 균형=가중치 합 4 이상, 인기=5 이상(2자 기준), 독특=제한 없음. 인기 이름은 항상 통과 */
-function isNatural(weights: number[], hangul: string, gender: Gender, style: Preferences['style']): boolean {
-  if (style === 'unique' || weights.length < 2 || isPopular(hangul, gender)) return true;
-  const sum = weights.reduce((a, b) => a + b, 0);
-  return sum >= (style === 'popular' ? 5 : 4);
+/** 실제로 많이 쓰는 이름 목록(성별 모름이면 둘 다) */
+function knownNames(gender: Gender): Set<string> {
+  const gs = gender === 'unknown' ? (['female', 'male'] as const) : ([gender] as const);
+  return new Set(gs.flatMap((g) => [...COMMON_NAMES[g], ...POPULAR_NAMES[g], ...DISTINCT_NAMES[g]]).filter((n) => !AWKWARD_NAMES.has(n)));
+}
+
+/**
+ * 어색한 조합 거르기. 한자 점수가 아무리 좋아도 실제로 잘 쓰지 않는 이름은 내지 않는다.
+ * - 낱말처럼 들리는 이름(하지·지하·이유·유린…)은 언제나 뺀다.
+ * - 두 글자 이름은 이름 느낌과 상관없이 실제로 쓰는 이름 목록(많이 쓰는·인기·개성 있는) 안에서만 고른다.
+ *   '흔하지 않은'은 그 목록 안에서 덜 흔한 이름을 앞에 둔다(preferenceOf).
+ * - 돌림자 등으로 후보가 너무 적을 때만(relaxed) 아주 흔한 음절끼리의 조합(가중치 합 5 이상)을 더한다.
+ */
+function isNatural(weights: number[], hangul: string, _gender: Gender, _style: Preferences['style'], known: Set<string>, relaxed: boolean): boolean {
+  if (AWKWARD_NAMES.has(hangul)) return false;
+  if (weights.length < 2) return true;
+  if (known.has(hangul)) return true;
+  return relaxed && weights.reduce((a, b) => a + b, 0) >= 5;
 }
 
 interface HangulCandidate {
@@ -140,22 +157,37 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     pools[pos] = new Map([[prefs.fixed.hangul, 3]]);
   }
 
-  // 1) 한글 후보
+  // 1) 한글 후보: 음절 풀의 조합 + 실제로 많이 쓰는 이름
   let combos: [string, number][][] = [[]];
   for (const p of pools) {
     const next: [string, number][][] = [];
     for (const c of combos) for (const e of p) next.push([...c, e]);
     combos = next;
   }
+  const known = knownNames(gender);
+  if (pools.length === 2) {
+    const seen = new Set(combos.map((c) => c.map(([s]) => s).join('')));
+    const fixedPos = prefs.fixed ? Math.min(Math.max(0, prefs.fixed.position), 1) : -1;
+    for (const name of [...known].sort()) {
+      const syl = [...name];
+      if (syl.length !== 2 || seen.has(name)) continue;
+      if (prefs.fixed && syl[fixedPos] !== prefs.fixed.hangul) continue;
+      combos.push(syl.map((s, i) => [s, pools[i]?.get(s) ?? 2] as [string, number]));
+      seen.add(name);
+    }
+  }
+  const build = (relaxed: boolean): HangulCandidate[] => {
   const hangulCands: HangulCandidate[] = [];
   for (const combo of combos) {
     const syl = combo.map(([s]) => s);
     if (syl.some((s, i) => i > 0 && s === syl[i - 1])) continue;
+    // 성과 이름 첫 글자가 같으면(정정우·이이서) 부르기 어색하다
+    if (syl[0] === surSyl[surSyl.length - 1] && !(prefs.fixed && prefs.fixed.position === 0)) continue;
     if (syl.some((s) => exclude.has(s) && !(prefs.fixed && s === prefs.fixed.hangul))) continue;
     if (syl.some((s) => excludeInitials.has(decompose(s)?.initial ?? ''))) continue;
     if (include.length > 0 && !syl.some((s) => include.includes(s))) continue;
     const hangulName = syl.join('');
-    if (!isNatural(combo.map(([, w]) => w), hangulName, gender, prefs.style)) continue;
+    if (!isNatural(combo.map(([, w]) => w), hangulName, gender, prefs.style, known, relaxed)) continue;
     const all = [...surSyl, ...syl];
     if (teaseWord(all.join(''))) continue;
     const flow = soundFlow(all, options.soundSchool, options.includeFinalConsonant);
@@ -177,6 +209,10 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
       pre: soundPts + vowelPts + practicalSound + preference * 3,
     });
   }
+  return hangulCands;
+  };
+  let hangulCands = build(false);
+  if (hangulCands.length < 40) hangulCands = build(true);
   hangulCands.sort((a, b) => b.pre - a.pre || cmpCodePoints(a.hangul, b.hangul));
   const kept = hangulCands.slice(0, HANGUL_KEEP);
 

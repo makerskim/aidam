@@ -181,6 +181,7 @@ export function NameWizard() {
         return draft.surname ? goNext() : setError('성을 쓰고 한자를 골라 주세요.');
       case 'given':
         return syllables.length ? goNext() : setError('이름을 한글로 써 주세요.');
+      case 'purpose':
       case 'count':
       case 'gender':
         return goNext();
@@ -200,7 +201,8 @@ export function NameWizard() {
 
   const [title, sub] = COPY[draft.step];
   const isLast = index === flow.length - 1 || (draft.purpose === 'check' && draft.step === 'birth');
-  const autoStep = draft.step === 'purpose' || (draft.step === 'gender' && !multi);
+  // 타일을 누르면 바로 넘어가지만, 모든 단계에 '다음' 버튼도 둔다
+  const autoStep = false;
   const ctaLabel = isLast ? (draft.purpose === 'check' ? '풀이 보기' : multi ? '이름 추천받기' : '이름 추천받기') : '다음';
 
   return (

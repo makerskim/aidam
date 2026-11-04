@@ -254,15 +254,17 @@ export function nameNarrative(report: NameReport, a: SajuAnalysis | null): strin
   if (a) {
     const good = report.resource.filter((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui');
     const bad = report.resource.filter((r) => a.roles[r.element] === 'gi');
-    if (good.length) parts.push(`${good.map((r) => r.ch).join('·')}의 ${[...new Set(good.map((r) => WORD[r.element]))].join('·')} 기운이 사주에 필요한 자리를 채워 주어, 이름이 아이의 부족한 기운을 보태요.`);
+    if (good.length) parts.push(`${good.map((r) => r.ch).join('·')}의 ${[...new Set(good.map((r) => el(r.element)))].join('·')} 기운이 사주에 필요한 자리를 채워 줘요. 이 아이에게 모자란 ${el(a.yongsin)} 기운을 이름이 평생 곁에서 보태 주는 셈이에요.`);
     else if (bad.length) parts.push(`다만 ${bad.map((r) => r.ch).join('·')}의 기운은 사주와 부딪혀요. 같은 소리의 다른 한자를 함께 살펴보세요.`);
+    else parts.push(`이 아이에게 필요한 ${el(a.yongsin)} 기운을 가진 한자로 바꾸면 사주를 더 잘 채울 수 있어요.`);
   }
   if (report.frames) {
     const badF = report.frameResults.filter((f) => f.info.luck === 'bad');
     parts.push(badF.length ? `획수로 본 운에서는 ${badF.map((f) => FRAME_KO[f.key].period).join('·')}이 아쉬워요.` : '획수로 본 초년부터 말년까지의 운도 모두 좋은 수로 이어져요.');
   }
   const flow = report.soundBySchool[report.options.soundSchool];
-  if (flow.pairs.length) parts.push(flow.pairs.some((p) => p.kind === 'clash') ? '소리의 흐름에 부딪히는 곳이 한 군데 있어요.' : '부를 때 소리의 기운도 자연스럽게 이어져요.');
+  if (flow.pairs.length) parts.push(flow.pairs.some((p) => p.kind === 'clash') ? '부를 때 소리의 흐름에 부딪히는 곳이 한 군데 있어요.' : '성부터 이름까지 부르는 소리의 기운이 서로 살려 주며 자연스럽게 이어져요.');
+  if (report.strokeYinYang?.balanced && report.vowel.level !== 'unbalanced') parts.push('획수의 홀짝과 모음의 밝고 어두움도 고르게 섞여 균형이 맞아요.');
   return parts.join(' ');
 }
 
@@ -505,7 +507,7 @@ function criterionSummary(c: Criterion, report: NameReport, a: SajuAnalysis | nu
       const u = report.soundBySchool.unhae.pairs.some((p) => p.kind === 'clash');
       if (h && u) return '두 학설 모두 부딪히는 소리가 있어요';
       if (h) return '해례본으로 보면 부딪히는 소리가 있어요';
-      if (u) return '해례본은 좋고, 운해본은 부딪혀요';
+      if (u) return '해례본으로는 잘 어울려요 (운해본은 부딪힘)';
       return c.verdict === 'good' ? '두 학설 모두 소리가 잘 어울려요' : '소리 흐름이 무난해요';
     }
     case 'suri': {

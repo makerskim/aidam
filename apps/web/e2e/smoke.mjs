@@ -25,6 +25,7 @@ assert.equal(await page.locator('.hero-brand').textContent(), '아이담');
 assert.ok(await page.locator('text=AIDAM').count());
 assert.ok(await page.locator('.hero >> text=이름 풀이').count(), '이름 풀이 버튼 없음');
 assert.equal(await page.locator('.story-step').count(), 3, '세 단계 소개 없음');
+assert.ok(await page.locator('h2:has-text("이름을 담기 위해")').count(), '소개 제목');
 assert.equal(await page.locator('.hero-brand').evaluate((el) => getComputedStyle(el).animationName), 'none', '브랜드가 움직임');
 assert.ok(await page.locator('.example-tag').count(), '예시 표시 없음');
 assert.ok(await page.locator('text=Made by makerskim').count(), '만든 사람 표기 없음');
@@ -43,7 +44,8 @@ console.log('✓ 로그인 안내 창');
 // 3) 한 명 작명: 성(한자) → 새 이름 → 한 명 → 성별 → 날짜·시각 입력/달력 → 조건
 await page.fill('#surname', '정');
 await page.waitForSelector('.opt-row');
-assert.equal(await page.locator('.opt-row').count(), 3, '정씨 한자 후보(鄭·丁·程)');
+assert.equal(await page.locator('.opt-row').count(), 2, '정씨 흔한 한자 후보(鄭·丁)');
+assert.ok(await page.locator('text=드물게 쓰는 한자 1개 더 보기').count(), '드문 성 한자 펼치기 없음');
 assert.equal(await page.locator('text=본관').count(), 0, '본관이 남아 있음');
 await page.click('.opt-row:has-text("鄭")');
 await page.click('button:has-text("다음")');
@@ -159,13 +161,19 @@ await twins('서로 어울리는 세트로');
 await page.waitForSelector('.set-card', { timeout: 40000 });
 assert.ok(await page.locator('.note-soft').count(), '같은 사주 안내 없음');
 assert.equal(await page.locator('.saju-panel').count(), 1, '만세력 하나씩 보기');
+assert.ok(await page.locator('.set-card .harmony-pair').count(), '세트 궁합 없음');
 await twins('아이마다 따로');
 await page.waitForSelector('.name-card', { timeout: 40000 });
-const first0 = await page.locator('.name-card .nc-name b').first().textContent();
-await page.click('.seg button:has-text("둘째")');
+// 사주가 같으면 두 아이 목록이 같고, 아이마다 하나씩 고른다
+const list0 = await page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
+await page.locator('.name-card .nc-pick').first().click();
 await page.waitForSelector('text=둘째 만세력');
-const names1 = await page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
-assert.ok(!names1.includes(first0), '같은 사주 쌍둥이에게 같은 이름이 겹침');
+const list1 = await page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
+assert.deepEqual(list1.slice(0, 10), list0.slice(0, 10), '같은 사주인데 목록이 다름');
+assert.ok(await page.locator('.name-card .nc-pick').first().isDisabled(), '첫째가 고른 이름을 둘째도 고를 수 있음');
+await page.locator('.name-card .nc-pick:not([disabled])').first().click();
+await page.waitForSelector('.pick-card .harmony-pair', { timeout: 20000 });
+assert.ok(await page.locator('.pick-card .harmony-score').count(), '다둥이 궁합 점수 없음');
 console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 
 // 9) 정한 이름 풀어보기(작명 흐름 안) → 아쉬운 항목 → 고치기 옵션

@@ -536,10 +536,15 @@ export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | 
   const init = useInit();
   const [text, setText] = useState(value?.hangul ?? '');
   const t = text.trim();
-  const matches = useMemo<InitSurname[]>(() => {
+  const [showRare, setShowRare] = useState(false);
+  const all = useMemo<InitSurname[]>(() => {
     if (!init || !t) return [];
     return init.surnames.filter((s) => s.hangul === t || s.readings.includes(t) || s.hanja === t);
   }, [init, t]);
+  // 거의 쓰지 않는 성 한자는 숨긴다(같은 소리의 흔한 성이 없거나, 직접 펼쳤을 때만 보여 줌)
+  const commonOnes = all.filter((s) => s.common);
+  const rareOnes = all.filter((s) => !s.common);
+  const matches = commonOnes.length && !showRare && !rareOnes.some((s) => s.hanja === value?.hanja) ? commonOnes : all;
   const pick = (s: InitSurname) => onChange({ hangul: s.hanja === t ? s.hangul : t, hanja: s.hanja });
 
   useEffect(() => {
@@ -558,6 +563,7 @@ export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | 
       autoComplete="family-name"
       onChange={(e) => {
         setText(e.target.value);
+        setShowRare(false);
         onChange(null);
       }}
     />
@@ -587,6 +593,11 @@ export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | 
             ))}
           </div>
         </div>
+      ) : null}
+      {matches.length > 0 && matches.length < all.length ? (
+        <button type="button" className="text-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setShowRare(true)}>
+          드물게 쓰는 한자 {all.length - matches.length}개 더 보기
+        </button>
       ) : null}
       {t && init && matches.length === 0 ? <p className="small muted">목록에 없는 성이에요. 다른 표기(이/리, 유/류)로 찾아보세요.</p> : null}
     </div>

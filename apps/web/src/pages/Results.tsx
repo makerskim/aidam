@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { Recommendation, SajuAnalysis, SajuResult, SiblingSet } from '@aidam/engine';
+import type { PairHarmony, Recommendation, SajuAnalysis, SajuResult, SiblingSet } from '@aidam/engine';
 import { call, errorMessage } from '../lib/engine';
 import { meaningFor } from '../lib/format';
 import { explainCriteria, shortTags, type Criterion } from '../lib/insights';
@@ -9,6 +9,7 @@ import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { readSession, useSessionState, writeSession } from '../lib/session';
 import { SajuPanel } from '../components/report';
+import { HarmonyView } from '../components/harmony';
 import { Disclaimer, ErrorText, Icon, Segmented, Staged } from '../components/ui';
 
 const PAGE = 20;
@@ -43,7 +44,16 @@ function reportQuery(state: NameState, rec: Recommendation, kidIndex: number | n
   return toQuery(a);
 }
 
-function NameCard({ rec, to, rank, label, onOpen }: { rec: Recommendation; to: string; rank?: number; label?: string; onOpen: () => void }) {
+interface Pick {
+  /** 이 목록의 아이 이름 (첫째·둘째) */
+  kid: string;
+  on: boolean;
+  /** 다른 아이가 이미 고른 이름이면 그 아이 */
+  takenBy: string | null;
+  onToggle: () => void;
+}
+
+function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation; to: string; rank?: number; label?: string; onOpen: () => void; pick?: Pick }) {
   const lib = useLibrary();
   const gate = useGate();
   const location = useLocation();
@@ -52,7 +62,7 @@ function NameCard({ rec, to, rank, label, onOpen }: { rec: Recommendation; to: s
   const saved = lib.isBookmarked(rec.hanja, query);
   const total = Math.round(rec.report.score.total);
   return (
-    <div className="name-card">
+    <div className={`name-card ${pick ? 'pickable' : ''} ${pick?.on ? 'picked' : ''}`}>
       <Link to={to} state={{ from: location.pathname + location.search, rank }} className="nc-link" onClick={onOpen}>
         {rank !== undefined ? <span className={`rank ${rank <= 3 ? 'top' : ''}`}>{rank}</span> : null}
         <span className="nc-main">
@@ -77,6 +87,18 @@ function NameCard({ rec, to, rank, label, onOpen }: { rec: Recommendation; to: s
       >
         {Icon.bookmark(saved)}
       </button>
+      {pick ? (
+        <button
+          type="button"
+          className={`nc-pick ${pick.on ? 'on' : ''}`}
+          disabled={Boolean(pick.takenBy) && !pick.on}
+          aria-pressed={pick.on}
+          aria-label={pick.on ? `${pick.kid} 이름에서 빼기` : pick.takenBy ? `${pick.takenBy}가 고른 이름` : `${pick.kid} 이름으로 고르기`}
+          onClick={pick.onToggle}
+        >
+          {pick.on ? `✓ ${pick.kid}` : pick.takenBy ? pick.takenBy : '고르기'}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -86,6 +108,8 @@ interface Ui {
   sort: 'score' | 'name';
   grade: string;
   shown: number;
+  /** 아이마다 고른 이름(한자 열쇠). 다둥이 '아이마다 따로'에서만 쓴다 */
+  picks: string[];
 }
 
 const GRADES = [
@@ -107,7 +131,7 @@ export function Results() {
   const mode: 'single' | 'each' | 'set' = !multi ? 'single' : state?.kidMode === 'each' ? 'each' : 'set';
   const [data, setData] = useState<Data | null>(() => cache.get(sKey) ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [ui, setUi] = useSessionState<Ui>(`results-ui:${sKey}:${fix ?? ''}`, { tab: '0', sort: 'score', grade: '', shown: PAGE });
+  const [ui, setUi] = useSessionState<Ui>(`results-ui:${sKey}:${fix ?? ''}`, { tab: '0', sort: 'score', grade: '', shown: PAGE, picks: [] });
   const restored = useRef(false);
 
   useEffect(() => {
@@ -129,6 +153,22 @@ export function Results() {
       alive = false;
     };
   }, [state, sKey, mode]);
+
+  // 아이마다 고른 이름이 다 차면 다둥이 궁합을 계산한다
+  const pickedRecs = data?.kind === 'each' ? data.kids.map((k, i) => k.recs.find((r) => r.hanja === ui.picks[i]) ?? null) : [];
+  const pickKey = pickedRecs.map((r) => r?.hanja ?? '').join('|');
+  const [harmony, setHarmony] = useState<{ key: string; pairs: PairHarmony[] } | null>(null);
+  useEffect(() => {
+    if (!state || data?.kind !== 'each' || pickedRecs.length < 2 || pickedRecs.some((r) => !r)) return;
+    let alive = true;
+    call('harmony', state, pickedRecs.map((r) => (r as Recommendation).report.input.given))
+      .then((h) => alive && setHarmony({ key: pickKey, pairs: h.pairs }))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickKey, data]);
 
   // 리포트에서 돌아오면 보던 자리로
   useLayoutEffect(() => {
@@ -165,6 +205,31 @@ export function Results() {
       <Segmented label="아이 선택" value={String(tabIndex)} options={data.kids.map((k, i) => ({ value: String(i), label: k.label }))} onChange={(tab) => setUi({ tab, shown: PAGE })} />
     ) : null;
 
+  const togglePick = (kidIndex: number, rec: Recommendation) => {
+    const picks = [...ui.picks];
+    const on = picks[kidIndex] === rec.hanja;
+    picks[kidIndex] = on ? '' : rec.hanja;
+    setUi({ picks });
+    if (!on && data?.kind === 'each') {
+      // 다음으로 고를 아이로 넘어간다
+      const next = data.kids.findIndex((_, i) => i !== kidIndex && !picks[i]);
+      if (next >= 0) {
+        setUi({ picks, tab: String(next) });
+        document.querySelector('.pick-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+  const pickFor = (kidIndex: number | null, rec: Recommendation): Pick | undefined => {
+    if (kidIndex === null || data?.kind !== 'each') return undefined;
+    const owner = data.kids.findIndex((k, i) => i !== kidIndex && pickedRecs[i]?.hangul === rec.hangul);
+    return {
+      kid: KID_LABELS[kidIndex] ?? '',
+      on: ui.picks[kidIndex] === rec.hanja,
+      takenBy: owner >= 0 ? (KID_LABELS[owner] ?? '') : null,
+      onToggle: () => togglePick(kidIndex, rec),
+    };
+  };
+
   const renderList = (recs: Recommendation[], saju: SajuResult | null, kidIndex: number | null) => {
     const list = filterList(recs, saju?.primary ?? null);
     return (
@@ -200,7 +265,7 @@ export function Results() {
         {list.length === 0 ? <p className="muted">조건에 맞는 이름이 없어요. 다른 등급을 골라 보세요.</p> : null}
         <div className="list-anim stack" style={{ gap: 10 }}>
           {list.slice(0, ui.shown).map((r, i) => (
-            <NameCard key={r.hanja} rec={r} rank={ui.sort === 'score' ? i + 1 : undefined} to={`/report?${reportQuery(state, r, kidIndex)}`} onOpen={remember} />
+            <NameCard key={r.hanja} rec={r} rank={ui.sort === 'score' ? i + 1 : undefined} to={`/report?${reportQuery(state, r, kidIndex)}`} onOpen={remember} pick={pickFor(kidIndex, r)} />
           ))}
         </div>
         {list.length > ui.shown ? (
@@ -221,7 +286,12 @@ export function Results() {
     multi ? (mode === 'set' ? '서로 어울리는 세트' : '아이마다 따로') : GENDER[state.gender],
     b ? `${b.calendar === 'lunar' ? '음력 ' : ''}${b.year}.${b.month}.${b.day}` : '생일 없이',
   ].join(' · ');
-  const sameNote = (data?.kind === 'each' || data?.kind === 'set') && data.sameSaju ? <p className="note-soft">아이들의 사주가 같아요. 같은 이름이 겹치지 않게 나눠 추천했어요.</p> : null;
+  const sameNote =
+    (data?.kind === 'each' || data?.kind === 'set') && data.sameSaju ? (
+      <p className="note-soft">
+        아이들의 사주가 같아 추천 목록도 같아요. {data.kind === 'each' ? '같은 목록에서 아이마다 이름을 하나씩 골라 보세요.' : '세트는 서로 다른 이름끼리 묶었어요.'}
+      </p>
+    ) : null;
 
   return (
     <main className="container page results">
@@ -248,6 +318,41 @@ export function Results() {
           {data?.kind === 'each' ? (
             <div className="stack-lg">
               {sameNote}
+              <section className="card pick-card" aria-label="고른 이름">
+                <div className="between">
+                  <h2>고른 이름</h2>
+                  {ui.picks.some(Boolean) ? (
+                    <button type="button" className="text-btn" onClick={() => setUi({ picks: [] })}>
+                      다시 고르기
+                    </button>
+                  ) : null}
+                </div>
+                <div className="pick-slots">
+                  {data.kids.map((k, i) => {
+                    const r = pickedRecs[i];
+                    return (
+                      <button key={k.label} type="button" className={`pick-slot ${i === tabIndex ? 'on' : ''}`} onClick={() => setUi({ tab: String(i), shown: PAGE })}>
+                        <span className="nc-label">{k.label}</span>
+                        {r ? (
+                          <b>
+                            {r.hangul} <span className="hj">{r.hanja}</span>
+                          </b>
+                        ) : (
+                          <span className="muted">{i === tabIndex ? '아래에서 고르는 중' : '아직 고르지 않았어요'}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {harmony && harmony.key === pickKey && pickedRecs.every(Boolean) ? (
+                  <div className="stack" style={{ gap: 8 }}>
+                    <h3 className="harmony-title">다둥이 궁합</h3>
+                    <HarmonyView pairs={harmony.pairs} names={pickedRecs.map((r) => r?.hangul.slice(state.surname.hangul.length) ?? '')} />
+                  </div>
+                ) : (
+                  <p className="tiny muted">아이마다 이름을 하나씩 고르면 이름끼리의 궁합을 보여 드려요.</p>
+                )}
+              </section>
               {kidTabs}
               {(() => {
                 const k = data.kids[Math.min(tabIndex, data.kids.length - 1)];
@@ -290,6 +395,7 @@ export function Results() {
                         <NameCard key={i} rec={n} label={KID_LABELS[i]} to={`/report?${reportQuery(state, n, i)}`} onOpen={remember} />
                       ))}
                     </div>
+                    <HarmonyView pairs={set.pairs} names={set.names.map((n) => n.hangul.slice(state.surname.hangul.length))} />
                   </article>
                 ))}
               </section>

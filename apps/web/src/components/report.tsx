@@ -4,7 +4,8 @@ import type { NameReport, Recommendation, SajuResult, PillarsResult } from '@aid
 import { ELEMENT_HANJA, ELEMENTS, type Element } from '@aidam/engine/src/core/elements';
 import { BRANCHES, STEMS, branchElement, stemElement, ZODIAC_KO } from '@aidam/engine/src/core/ganji';
 import { meaningFor } from '../lib/format';
-import { explainCriteria, nameHighlights, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, type Criterion, type SajuRow } from '../lib/insights';
+import { explainCriteria, nameHighlights, nameNarrative, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, tidy, type Criterion, type SajuRow } from '../lib/insights';
+import { Rich } from './rich';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { useCountUp } from '../lib/motion';
@@ -207,7 +208,9 @@ function SajuEvalRow({ r, power }: { r: SajuRow; power: Record<Element, number> 
           {!power ? (
             <ul className="plain-list">
               {r.detail.map((t, i) => (
-                <li key={i}>{t}</li>
+                <li key={i}>
+                  <Rich text={t} />
+                </li>
               ))}
             </ul>
           ) : null}
@@ -302,7 +305,9 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
       ) : null}
       {open ? (
         <div className="crit-detail">
-          <p className="crit-why">{c.why}</p>
+          <p className="crit-why">
+            <Rich text={c.why} />
+          </p>
           {c.table ? (
             <dl className="mini-table">
               {c.table.map((t) => (
@@ -316,14 +321,18 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
           {c.pros.length ? (
             <ul className="pc pros" aria-label="좋은 점">
               {c.pros.map((t, i) => (
-                <li key={i}>{t}</li>
+                <li key={i}>
+                  <Rich text={t} />
+                </li>
               ))}
             </ul>
           ) : null}
           {c.cons.length ? (
             <ul className="pc cons" aria-label="아쉬운 점">
               {c.cons.map((t, i) => (
-                <li key={i}>{t}</li>
+                <li key={i}>
+                  <Rich text={t} />
+                </li>
               ))}
             </ul>
           ) : null}
@@ -436,13 +445,18 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
           {report.fullHangul}
           {report.fullHanja ? <span className="muted"> {report.fullHanja}</span> : null}, {GRADE_LINE[report.score.grade] ?? ''}
         </p>
+        <p className="summary-body">
+          <Rich text={tidy(nameNarrative(report, a))} />
+        </p>
         <div className="hl">
           {hl.good.length ? (
             <div className="hl-col good">
               <span className="hl-head">좋은 점</span>
               <ul>
                 {hl.good.map((t) => (
-                  <li key={t}>{t}</li>
+                  <li key={t}>
+                    <Rich text={t} />
+                  </li>
                 ))}
               </ul>
             </div>
@@ -452,7 +466,9 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
               <span className="hl-head">아쉬운 점</span>
               <ul>
                 {hl.bad.map((t) => (
-                  <li key={t}>{t}</li>
+                  <li key={t}>
+                    <Rich text={t} />
+                  </li>
                 ))}
               </ul>
             </div>

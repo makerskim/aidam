@@ -91,3 +91,14 @@ describe('성씨', () => {
     expect(surnameStrokes('南宮')).toBe(19);
   });
 });
+
+describe('성씨 목록', () => {
+  it('강·정은 흔한 성 한자만 흔한 성으로 표시된다', async () => {
+    const { SURNAMES } = await import('../src/name/surnames');
+    const commonOf = (r: string) => SURNAMES.filter((s) => s.common && (s.hangul === r || s.readings.includes(r))).map((s) => s.hanja);
+    expect(commonOf('강')).toEqual(['姜', '康']);
+    expect(commonOf('정')).toEqual(['鄭', '丁']);
+    expect(SURNAMES.find((s) => s.hanja === '强')?.common).toBe(false);
+    expect(SURNAMES.find((s) => s.hanja === '鮮于')?.common).toBe(true);
+  });
+});

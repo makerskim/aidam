@@ -3,9 +3,9 @@ import { useGate } from '../lib/gate';
 import { useReveal } from '../lib/motion';
 
 const STEPS = [
-  { n: '01', title: '태어난 순간', text: '만세력으로 사주를 세워요' },
-  { n: '02', title: '필요한 기운', text: '모자란 기운을 찾아요' },
-  { n: '03', title: '꼭 맞는 이름', text: '그 기운을 담아 지어요' },
+  { n: '01', title: '태어난 순간', text: '태어난 날과 시각, 지역으로 만세력을 펼쳐 아이만의 사주 여덟 글자를 세워요.' },
+  { n: '02', title: '필요한 기운', text: '나무·불·흙·쇠·물 다섯 기운 가운데 넘치는 것과 모자란 것을 살펴, 이름에 담을 기운을 정해요.' },
+  { n: '03', title: '꼭 맞는 이름', text: '그 기운을 지닌 한자에 부르는 소리와 획수, 뜻까지 맞춰 오래 불러도 좋은 이름을 골라요.' },
 ];
 
 const FEATURES = [
@@ -183,7 +183,7 @@ export function Landing() {
 
       <section className="band">
         <div className="container">
-          <h2 className="band-title reveal">이름에 담기까지</h2>
+          <h2 className="band-title reveal">이름을 담기 위해</h2>
           <div className="story" ref={storyRef}>
             <div className="story-visual" aria-hidden="true">
               <span className="example-tag">예시</span>

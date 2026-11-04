@@ -111,7 +111,13 @@ export function Notice({ children, warn = false }: { children: ReactNode; warn?:
 }
 
 export function Disclaimer() {
-  return <p className="tiny muted">전통 성명학에 따른 참고 정보예요. 출생신고 전 대법원 인명용 한자를 확인하세요.</p>;
+  return (
+    <p className="disclaimer">
+      전통 성명학에 따른 참고 정보예요.
+      <br />
+      출생신고 전에 대법원 인명용 한자인지 꼭 확인하세요.
+    </p>
+  );
 }
 
 /** 아래 버튼 묶음: 데스크톱은 오른쪽 정렬, 모바일은 화면 아래 고정 */
