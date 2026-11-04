@@ -5,7 +5,7 @@ import { decompose } from '@aidam/engine/src/hangul/jamo';
 import { call, errorMessage } from '../lib/engine';
 import { meaningFor } from '../lib/format';
 import { shortTags } from '../lib/insights';
-import { fromSearch, KID_LABELS, kidBirth, STATE_VERSION, toQuery, type AnalyzeState, type NameState } from '../lib/state';
+import { fromSearch, KID_LABELS, kidBirth, STATE_VERSION, surnameLabel, toQuery, type AnalyzeState, type NameState } from '../lib/state';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { SajuCard } from '../components/report';
@@ -116,7 +116,7 @@ export function Results() {
       <div className="between" style={{ marginBottom: 32 }}>
         <div>
           <span className="section-kicker">{multi ? '다둥이 이름' : '추천 이름'}</span>
-          <h1 style={{ marginTop: 4 }}>{state.surname.hangul}씨 {multi ? '아이들' : '아기'}에게 어울리는 이름</h1>
+          <h1 style={{ marginTop: 4 }}>{surnameLabel(state.surname)} {multi ? '아이들' : '아기'}에게 어울리는 이름</h1>
         </div>
         <Link className="btn btn-outline btn-sm" to={`/name?${toQuery(state)}`}>
           조건 바꾸기

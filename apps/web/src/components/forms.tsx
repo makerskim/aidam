@@ -3,7 +3,8 @@ import type { BirthInput, SajuOptions, SchoolOptions, Surname } from '@aidam/eng
 import { PLACES } from '@aidam/engine/src/calendar/places';
 import { call } from '../lib/engine';
 import type { HanjaOption } from '../lib/api';
-import type { SurnameSel } from '../lib/state';
+import { surnameLabel, type SurnameSel } from '../lib/state';
+import { surnameInfo } from '../lib/surname-info';
 import { ElementChip, Field, Picker, Segmented, Switch, type PickerGroup } from './ui';
 
 // ── 엔진 초기 데이터(성씨 목록) ─────────────────────────
@@ -164,38 +165,54 @@ export function BirthFields({ value, onChange, idPrefix, hideTime = false }: { v
 }
 
 // ── 성씨 ───────────────────────────────────────────────
+type InitSurname = Surname & { strokes: number; meaning: string };
+
+/** 사전 뜻 중 '성 ○'이 아닌 첫 뜻 (큐레이션 목록에 없을 때만 씀) */
+function fallbackHun(meaning: string): string {
+  const segs = meaning.split(/[,/]/).map((x) => x.trim()).filter(Boolean);
+  return segs.find((x) => !/^성(씨)?\s/.test(x)) ?? segs[0] ?? '';
+}
+
 export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | null; onChange: (v: SurnameSel | null) => void; label?: string }) {
   const init = useInit();
   const [text, setText] = useState(value?.hangul ?? '');
-  const matches = useMemo<Surname[]>(() => {
-    if (!init || !text.trim()) return [];
-    const t = text.trim();
-    return init.surnames.filter((s) => s.hangul === t || s.readings.includes(t));
-  }, [init, text]);
+  const t = text.trim();
+  const matches = useMemo<InitSurname[]>(() => {
+    if (!init || !t) return [];
+    return init.surnames.filter((s) => s.hangul === t || s.readings.includes(t) || s.hanja === t);
+  }, [init, t]);
+  const pick = (s: InitSurname, bongwan?: string) => onChange({ hangul: s.hanja === t ? s.hangul : t, hanja: s.hanja, ...(bongwan ? { bongwan } : {}) });
 
   useEffect(() => {
-    if (matches.length === 1 && value?.hanja !== matches[0]!.hanja) onChange({ hangul: text.trim(), hanja: matches[0]!.hanja });
+    if (matches.length === 1 && value?.hanja !== matches[0]!.hanja) pick(matches[0]!);
     // 하나뿐이면 자동 선택
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matches]);
 
+  const selected = matches.find((s) => s.hanja === value?.hanja) ?? null;
+  const clans = selected ? (surnameInfo(selected.hanja)?.clans ?? []) : [];
+  const customValue = value?.bongwan && !clans.includes(value.bongwan) ? value.bongwan : '';
+  const [custom, setCustom] = useState(Boolean(customValue));
+  const [customText, setCustomText] = useState(customValue);
+  const setClan = (b: string | undefined) => selected && pick(selected, b);
+
   const input = (
     <input
       id="surname"
-      className="input"
+      className="input input-xl"
       placeholder="예: 김"
       value={text}
       maxLength={2}
       autoComplete="family-name"
       onChange={(e) => {
         setText(e.target.value);
+        setCustom(false);
         onChange(null);
       }}
-      style={{ maxWidth: 360 }}
     />
   );
   return (
-    <div className="stack">
+    <div className="stack" style={{ gap: 26 }}>
       {label ? (
         <Field label={label} htmlFor="surname">
           {input}
@@ -204,15 +221,79 @@ export function SurnamePicker({ value, onChange, label }: { value: SurnameSel | 
         input
       )}
       {matches.length > 0 ? (
-        <div className="chips" role="group" aria-label="성씨 한자">
-          {matches.map((s) => (
-            <button key={s.hanja} type="button" className="choice" aria-pressed={value?.hanja === s.hanja} onClick={() => onChange({ hangul: text.trim(), hanja: s.hanja })}>
-              {s.hanja} {s.hangul}
-            </button>
-          ))}
+        <div className="field">
+          <span className="label">{matches.length > 1 ? `‘${t}’ 씨는 한자가 ${matches.length}가지예요` : '한자'}</span>
+          <div className="opt-list" role="radiogroup" aria-label="성씨 한자">
+            {matches.map((s) => {
+              const info = surnameInfo(s.hanja);
+              const top = info?.clans.slice(0, 3) ?? [];
+              return (
+                <button key={s.hanja} type="button" role="radio" aria-checked={value?.hanja === s.hanja} className="opt-row" onClick={() => pick(s)}>
+                  <span className="opt-hanja">{s.hanja}</span>
+                  <span className="opt-text">
+                    <b>{info?.hun ?? fallbackHun(s.meaning)}</b>
+                    <small>
+                      {s.strokes}획{top.length ? ` · ${top.join('·')}${(info?.clans.length ?? 0) > 3 ? ' 등' : ''}` : ''}
+                    </small>
+                  </span>
+                  <span className="opt-check" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
-      {text && init && matches.length === 0 ? <p className="small muted">목록에 없는 성씨예요. 다른 표기(이/리)로 찾아보세요.</p> : null}
+      {selected ? (
+        <div className="field">
+          <span className="label">
+            본관 <span style={{ fontWeight: 500, color: 'var(--text-3)' }}>· 고르지 않아도 돼요</span>
+          </span>
+          <div className="chips" role="group" aria-label="본관">
+            {clans.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="choice"
+                aria-pressed={value?.bongwan === c}
+                onClick={() => {
+                  setCustom(false);
+                  setClan(value?.bongwan === c ? undefined : c);
+                }}
+              >
+                {c}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="choice"
+              aria-pressed={custom}
+              onClick={() => {
+                setCustom(!custom);
+                setCustomText('');
+                setClan(undefined);
+              }}
+            >
+              {clans.length ? '목록에 없어요' : '직접 입력'}
+            </button>
+          </div>
+          {custom ? (
+            <input
+              id="bongwan"
+              className="input"
+              placeholder="본관을 한글로 (예: 김해)"
+              maxLength={6}
+              value={customText}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, '');
+                setCustomText(v);
+                setClan(/^[가-힣]+$/.test(v) ? v : undefined);
+              }}
+            />
+          ) : null}
+          <p className="tiny muted">본관은 점수에 영향을 주지 않고, 결과에 ‘{value ? surnameLabel(value) : `${t}씨`}’로 적혀요.</p>
+        </div>
+      ) : null}
+      {t && init && matches.length === 0 ? <p className="small muted">목록에 없는 성씨예요. 다른 표기(이/리, 유/류)로 찾아보세요.</p> : null}
     </div>
   );
 }

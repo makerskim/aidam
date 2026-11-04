@@ -7,6 +7,7 @@ import {
   computeSaju,
   DATA_VERSION,
   ENGINE_VERSION,
+  getHanja,
   hanjaByReading,
   isNameHanja,
   isPositiveMeaning,
@@ -14,6 +15,7 @@ import {
   recommendSiblingSets,
   suggestBetterHanja,
   SURNAMES,
+  surnameStrokes,
   type BirthInput,
   type SajuOptions,
 } from '@aidam/engine';
@@ -36,7 +38,8 @@ export interface HanjaOption {
 
 export const api = {
   init() {
-    return { surnames: SURNAMES.map((s) => ({ ...s })), engineVersion: ENGINE_VERSION, dataVersion: DATA_VERSION };
+    const surnames = SURNAMES.map((s) => ({ ...s, strokes: surnameStrokes(s.hanja), meaning: [...s.hanja].map((ch) => getHanja(ch)?.meaning ?? '').join(' / ') }));
+    return { surnames, engineVersion: ENGINE_VERSION, dataVersion: DATA_VERSION };
   },
   saju(birth: BirthInput, opts: SajuOptions) {
     return computeSaju(birth, opts);

@@ -53,10 +53,10 @@ function fromState(s: NameState): Draft {
 }
 
 const COPY: Record<Step, [string, string]> = {
-  1: ['아기 성이 무엇인가요?', '한글로 쓰면 한자를 골라 드려요.'],
-  2: ['아기는 몇 명인가요?', '쌍둥이라면 아이마다 사주를 따로 보고 어울리는 이름 세트를 지어요.'],
+  1: ['아기 성이 무엇인가요?', '한글로 쓰면 한자와 본관을 고를 수 있어요.'],
+  2: ['아기는 몇 명인가요?', '쌍둥이면 아이마다 사주를 보고 이름 세트를 지어요.'],
   3: ['성별을 알려 주세요', '이름의 어감을 고르는 데 써요.'],
-  4: ['언제, 어디서 태어났나요?', '태어난 시각과 지역까지 알면 사주를 더 정확하게 세울 수 있어요.'],
+  4: ['언제, 어디서 태어났나요?', '시각과 지역까지 알면 사주가 더 정확해요.'],
   5: ['어떤 이름이 좋으세요?', '정하지 않아도 괜찮아요. 사주에 가장 잘 맞는 이름부터 보여 드려요.'],
 };
 
@@ -248,9 +248,9 @@ export function NameWizard() {
             </Field>
             <Field label="돌림자 (없으면 비워 두세요)" htmlFor="fixed">
               <div className="row" style={{ flexWrap: 'nowrap' }}>
-                <input id="fixed" className="input" placeholder="예: 윤" maxLength={1} value={draft.fixedHangul} onChange={(e) => setDraft({ fixedHangul: e.target.value, fixedHanja: null })} style={{ maxWidth: 200 }} />
+                <input id="fixed" className="input" placeholder="예: 윤" maxLength={1} value={draft.fixedHangul} onChange={(e) => setDraft({ fixedHangul: e.target.value, fixedHanja: null })} style={{ width: 120, flex: '0 0 auto' }} />
                 {draft.prefs.length === 2 ? (
-                  <div style={{ flex: 1, maxWidth: 280 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <Segmented
                       label="돌림자 위치"
                       value={String(draft.fixedPos)}

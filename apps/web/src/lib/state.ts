@@ -6,7 +6,12 @@ export const STATE_VERSION = 1;
 export interface SurnameSel {
   hangul: string;
   hanja: string;
+  /** 본관 (예: 김해). 표시용이며 점수에는 쓰지 않는다 */
+  bongwan?: string;
 }
+
+/** "김해 김씨" / "김씨" */
+export const surnameLabel = (s: SurnameSel): string => `${s.bongwan ? `${s.bongwan} ` : ''}${s.hangul}씨`;
 
 interface Common {
   v: number;

@@ -45,7 +45,11 @@ await page.waitForSelector('#surname');
 console.log('✓ 로그인 안내 창');
 
 // 3) 한 명 작명: 성 → 아기 수 → 성별 → 출생(피커) → 조건
-await page.fill('#surname', '김');
+await page.fill('#surname', '정');
+await page.waitForSelector('.opt-row');
+assert.equal(await page.locator('.opt-row').count(), 3, '정씨 한자 후보(鄭·丁·程)');
+await page.click('.opt-row:has-text("鄭")');
+await page.click('.choice:has-text("동래")');
 await page.click('button:has-text("다음")');
 await page.click('button.tile:has-text("한 명")');
 await page.click('button.tile:has-text("여자아이")');
@@ -56,6 +60,8 @@ await page.click('button:has-text("다음")');
 await page.click('button:has-text("이름 추천받기")');
 await page.waitForSelector('.name-row', { timeout: 40000 });
 assert.ok(await page.locator('text=작명가의 풀이').count(), '사주 풀이가 먼저 보이지 않음');
+assert.ok(await page.locator('h1:has-text("동래 정씨")').count(), '본관이 제목에 없음');
+const listScore = (await page.locator('.name-row .score b').first().textContent())?.trim();
 console.log(`✓ 사주 분석 + 추천 ${await page.locator('.name-row').count()}개`);
 
 // 4) 리포트: 기준 카드 5개(좋은 점·아쉬운 점), 점수표, 분석 코드 없음
@@ -65,6 +71,10 @@ assert.equal(await page.locator('.crit').count(), 5, '기준 카드 수');
 assert.ok(await page.locator('.pc.pros li').count() >= 3, '좋은 점 설명 부족');
 assert.ok(await page.locator('table[aria-label="점수표"]').count(), '점수표 없음');
 assert.equal(await page.locator('text=분석 코드').count(), 0);
+await page
+  .waitForFunction((v) => document.querySelector('.scoreline b')?.textContent?.trim() === `${v}점`, listScore, { timeout: 5000 })
+  .catch(() => assert.fail(`목록 점수(${listScore})와 리포트 점수가 다름`));
+assert.ok(await page.locator('.syl-meaning:has-text("동래 정씨")').count(), '리포트에 본관 표시 없음');
 const name1 = await page.locator('.syls').first().getAttribute('aria-label');
 console.log('✓ 리포트(기준별 쉬운 풀이·점수표)');
 

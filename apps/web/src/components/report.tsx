@@ -11,7 +11,7 @@ import { useCountUp } from '../lib/motion';
 import { fromSearch, toQuery, type AnalyzeState } from '../lib/state';
 import { Icon } from './ui';
 
-export function NameHero({ report }: { report: NameReport }) {
+export function NameHero({ report, clan }: { report: NameReport; clan?: string }) {
   const sur = report.input.surname.map((c, i) => ({ c, h: report.surnameChars[i] ?? null, sur: true }));
   const giv = report.input.given.map((c, i) => ({ c, h: report.chars[i] ?? null, sur: false }));
   return (
@@ -21,6 +21,7 @@ export function NameHero({ report }: { report: NameReport }) {
           <span className="syl-ko">{c.hangul}</span>
           <span className="syl-hanja">{c.hanja ?? '–'}</span>
           {!isSur && h ? <span className="syl-meaning">{meaningFor(h.meaning, c.hangul)}</span> : null}
+          {isSur && i === 0 && clan ? <span className="syl-meaning">{clan} {report.input.surname.map((x) => x.hangul).join('')}씨</span> : null}
         </div>
       ))}
     </div>
@@ -245,7 +246,7 @@ export function SajuCard({ saju }: { saju: SajuResult }) {
   );
 }
 
-export function ReportView({ report, saju, better, query }: { report: NameReport; saju: SajuResult | null; better: Recommendation[]; query: string }) {
+export function ReportView({ report, saju, better, query, clan }: { report: NameReport; saju: SajuResult | null; better: Recommendation[]; query: string; clan?: string }) {
   const lib = useLibrary();
   const gate = useGate();
   const key = report.fullHanja ?? report.fullHangul;
@@ -279,7 +280,7 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
       <aside className="sticky-col stack" style={{ gap: 24 }}>
         <div className="card stack" style={{ gap: 20 }}>
           <div className="between" style={{ alignItems: 'flex-start' }}>
-            <NameHero report={report} />
+            <NameHero report={report} clan={clan} />
             <div className="row" style={{ flexWrap: 'nowrap', gap: 0 }}>
               <button
                 type="button"

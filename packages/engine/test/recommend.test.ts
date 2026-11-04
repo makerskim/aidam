@@ -3,7 +3,7 @@ import { recommendNames, DEFAULT_PREFERENCES } from '../src/recommend/recommend'
 import { SYLLABLES, POPULAR_NAMES, FAMILIAR_HANJA } from '../src/recommend/syllables';
 import { isPositiveMeaning } from '../src/name/safety';
 import { applyDueum } from '../src/hangul/dueum';
-import { DEFAULT_SCHOOL_OPTIONS } from '../src/name/analyze';
+import { analyzeName, DEFAULT_SCHOOL_OPTIONS } from '../src/name/analyze';
 import { analyzePillars } from '../src/saju/analysis';
 import { BRANCHES, STEMS, type Pillar } from '../src/core/ganji';
 import { getHanja, isNameHanja } from '../src/name/hanjaDb';
@@ -53,6 +53,16 @@ describe('추천', () => {
   it('점수 내림차순', () => {
     const totals = recs.map((r) => r.report.score.total);
     expect([...totals].sort((a, b) => b - a)).toEqual(totals);
+  });
+  it('추천 점수 = 같은 이름을 직접 풀어 본 점수 (이름 느낌을 바꿔도)', () => {
+    for (const style of ['popular', 'unique'] as const) {
+      const list = recommendNames({ ...base, prefs: { ...DEFAULT_PREFERENCES, style } });
+      for (const r of list.slice(0, 10)) {
+        const given = [...r.hangul.slice(1)].map((h, i) => ({ hangul: h, hanja: r.hanja.slice(1)[i] ?? null }));
+        const solo = analyzeName({ surname: base.surname, given, gender: base.gender }, saju, base.options);
+        expect(solo.score.total).toBe(r.report.score.total);
+      }
+    }
   });
   it('한글 이름당 한자 조합은 최대 2개', () => {
     const count = new Map<string, number>();

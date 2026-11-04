@@ -225,17 +225,23 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   scored.sort((a, b) => b.total - a.total || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja));
 
   // 4) 정식 분석으로 확정
-  const out: Recommendation[] = [];
+  // 점수는 '이름 풀어보기'와 똑같이 매긴다(같은 이름이면 어디서나 같은 점수).
+  // 이름 느낌(인기·특별) 선호는 후보 고르기와 같은 점수 안의 순서에만 쓴다.
+  const out: (Recommendation & { pref: number })[] = [];
   for (const s of scored.slice(0, limit)) {
     const given = [...s.hangul].map((h, i) => ({ hangul: h, hanja: s.entries[i]?.ch ?? null }));
     const pref = hangulCands.find((c) => c.hangul === s.hangul)?.preference ?? 1;
-    const report = analyzeName({ surname, given, gender }, saju, options, pref);
-    out.push({ hangul: `${surSyl.join('')}${s.hangul}`, hanja: `${surname.map((c) => c.hanja).join('')}${s.hanja}`, report });
+    const report = analyzeName({ surname, given, gender }, saju, options);
+    out.push({ hangul: `${surSyl.join('')}${s.hangul}`, hanja: `${surname.map((c) => c.hanja).join('')}${s.hanja}`, report, pref });
   }
   out.sort(
-    (a, b) => b.report.score.total - a.report.score.total || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja),
+    (a, b) =>
+      b.report.score.total - a.report.score.total ||
+      b.pref - a.pref ||
+      cmpCodePoints(a.hangul, b.hangul) ||
+      cmpCodePoints(a.hanja, b.hanja),
   );
-  return out;
+  return out.map(({ pref: _pref, ...r }) => r);
 }
 
 export type { Element };
