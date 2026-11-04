@@ -195,7 +195,9 @@ function SajuEvalRow({ r, power }: { r: SajuRow; power: Record<Element, number> 
         <span className={`vdot ${r.verdict ?? 'need'}`} aria-hidden="true" />
         <span className="cr-text">
           <b>{r.title}</b>
-          <span>{r.summary}</span>
+          <span>
+            <Rich text={r.summary} />
+          </span>
         </span>
         {r.verdict ? <span className={`verdict ${VERDICT_CLS[r.verdict]}`}>{r.verdictText}</span> : null}
         <span className="cr-chev" aria-hidden="true">
@@ -283,7 +285,9 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
         <span className={`vdot ${VERDICT_CLS[c.verdict]}`} aria-hidden="true" />
         <span className="cr-text">
           <b>{c.title}</b>
-          <span>{c.summary}</span>
+          <span>
+            <Rich text={c.summary} />
+          </span>
         </span>
         <span className="cr-right">
           <span className={`verdict ${VERDICT_CLS[c.verdict]}`}>{c.verdictText}</span>
@@ -342,6 +346,10 @@ function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
     </article>
   );
 }
+
+/** 점수만으로도 좋고 나쁨을 바로 알 수 있게 */
+const VERDICT_OF_GRADE: Record<string, 'good' | 'ok' | 'bad'> = { S: 'good', A: 'good', B: 'ok', C: 'bad', D: 'bad' };
+const VERDICT_WORD: Record<string, string> = { S: '아주 좋은 이름', A: '좋은 이름', B: '무난한 이름', C: '아쉬운 이름', D: '바꾸기를 권해요' };
 
 const GRADE_LINE: Record<string, string> = {
   S: '이 아이에게 아주 잘 맞는 이름이에요.',
@@ -436,6 +444,7 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
             <small>점</small>
           </b>
           <span className={`grade-pill lg g-${report.score.grade}`}>{report.score.grade}등급</span>
+          <span className={`verdict-line ${VERDICT_OF_GRADE[report.score.grade] ?? 'ok'}`}>{VERDICT_WORD[report.score.grade] ?? ''}</span>
         </div>
       </section>
 
@@ -490,6 +499,24 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
           </CriterionRow>
         ))}
       </section>
+
+      <details className="card-soft why-diff">
+        <summary>다른 작명 서비스와 점수가 다른가요?</summary>
+        <ul className="plain-list small">
+          <li>
+            <b>획수</b>: 아이담은 부수를 본래 글자로 세는 <b>원획</b>(氵=水 4획, 艹=艸 6획)을 써요. 쓰는 대로 세는 곳과는 획수 운이 달라질 수 있어요.
+          </li>
+          <li>
+            <b>소리오행</b>: ㅇ·ㅎ을 물(水), ㅁ·ㅂ·ㅍ을 흙(土)으로 보는 <b>해례본</b>이 기준이고, 반대로 보는 <b>운해본</b> 결과도 함께 보여 드려요.
+          </li>
+          <li>
+            <b>필요한 기운</b>: 사주의 강약(억부)과 계절(조후)을 함께 따져 정해요. 한 가지 방법만 쓰는 곳과는 다를 수 있어요.
+          </li>
+          <li>
+            <b>태어난 시각</b>: 태어난 지역의 해 시간으로 보정해요(서울은 약 32분 늦춤). 설정에서 끌 수 있어요.
+          </li>
+        </ul>
+      </details>
 
       {better.length ? (
         <section className="stack" style={{ gap: 10 }} aria-label="같은 소리 더 좋은 한자">

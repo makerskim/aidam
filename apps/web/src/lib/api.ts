@@ -38,6 +38,9 @@ export interface HanjaOption {
   favor: number | null;
 }
 
+/** 자주 쓰는 한자 목록의 순서(앞일수록 이름에 흔히 씀) */
+const FAMILIAR_ORDER = new Map([...FAMILIAR_HANJA].map((c, i) => [c, i]));
+
 export const api = {
   init() {
     const surnames = SURNAMES.map((s) => ({ ...s, strokes: surnameStrokes(s.hanja), meaning: [...s.hanja].map((ch) => getHanja(ch)?.meaning ?? '').join(' / ') }));
@@ -117,9 +120,15 @@ export const api = {
       familiar: FAMILIAR_HANJA.has(h.ch) || isPositiveMeaning(h.meaning),
       favor: favor ? favor[h.element] : null,
     }));
-    const rank = (o: HanjaOption) =>
-      (o.nameUse ? 4 : 0) + (o.familiar ? 2 : 0) + (o.meaning ? 1 : 0) - (o.negative ? 5 : 0) + (o.favor ?? 0) * 0.5;
-    return list.sort((a, b) => rank(b) - rank(a) || (a.ch.codePointAt(0) ?? 0) - (b.ch.codePointAt(0) ?? 0));
+    // 이름에 많이 쓰는 한자부터: 자주 쓰는 한자 목록의 순서 → 인명용·좋은 뜻 → 나머지, 피하는 뜻은 맨 뒤
+    const tier = (o: HanjaOption) => (o.negative || !o.nameUse ? 3 : FAMILIAR_ORDER.has(o.ch) ? 0 : o.familiar ? 1 : 2);
+    return list.sort(
+      (a, b) =>
+        tier(a) - tier(b) ||
+        (FAMILIAR_ORDER.get(a.ch) ?? 0) - (FAMILIAR_ORDER.get(b.ch) ?? 0) ||
+        a.strokes - b.strokes ||
+        (a.ch.codePointAt(0) ?? 0) - (b.ch.codePointAt(0) ?? 0),
+    );
   },
 };
 

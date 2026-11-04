@@ -20,41 +20,18 @@ Made by makerskim
 
 ---
 
-## 사이트 공개하기 (Netlify, 무료)
+## 사이트 공개하기 (GitHub Pages, 무료)
 
-코딩을 몰라도 아래 순서대로 누르기만 하면 됩니다. 처음 한 번만 하면 이후에는 GitHub에 수정이 올라올 때마다 사이트가 자동으로 바뀝니다.
+공개 저장소라면 GitHub Pages와 GitHub Actions가 모두 무료이고 배포 횟수 제한·크레딧이 없습니다. 처음 한 번만 아래를 하면, 이후에는 GitHub에 수정이 올라올 때마다 사이트가 자동으로 바뀝니다.
 
-1. **https://app.netlify.com/signup** 에 들어가 **GitHub** 버튼으로 가입합니다(GitHub 계정으로 로그인).
-2. 로그인 후 첫 화면에서 **Add new site**(또는 **Add new project**) → **Import an existing project**를 누릅니다.
-3. **Deploy with GitHub**를 누르고, 권한을 묻는 창이 뜨면 **Authorize**를 누릅니다.
-4. 저장소 목록에서 **aidam**을 고릅니다. (안 보이면 아래쪽 *Configure the Netlify app on GitHub*를 눌러 aidam 저장소를 허용해 주세요.)
-5. 설정 화면이 나오면 **아무것도 바꾸지 말고** 맨 아래 **Deploy aidam**(또는 **Deploy site**)를 누릅니다. 빌드 설정은 저장소의 `netlify.toml` 파일에 이미 들어 있습니다.
-6. 2~3분 기다리면 `https://무작위이름.netlify.app` 주소가 생깁니다. 이 주소가 사이트입니다.
-7. 주소를 바꾸고 싶으면 **Site configuration → Change site name**에서 `aidam` 등으로 바꿀 수 있습니다(이미 쓰는 사람이 없을 때).
+1. **https://github.com/makerskim/aidam/settings** 맨 아래 **Danger Zone → Change repository visibility → Change to public**을 누르고 안내대로 확인합니다.
+2. 같은 설정 화면 왼쪽 메뉴 **Pages**를 누르고, **Build and deployment → Source**를 **GitHub Actions**로 바꿉니다.
+3. 저장소 위쪽 **Actions** 탭 → 왼쪽 **Pages** → 오른쪽 **Run workflow** 버튼을 눌러 첫 배포를 시작합니다(2~3분).
+4. 끝나면 **https://makerskim.github.io/aidam/** 이 사이트 주소입니다.
+5. Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 `makerskim.github.io`를 추가합니다(구글 로그인용).
+6. Netlify는 더 쓰지 않으므로 Netlify에서 **Site configuration → Delete site**로 지워도 됩니다.
 
-빌드가 실패하면 Netlify의 **Deploys** 화면에서 빨간 항목을 눌러 로그를 복사해 Claude에게 보여 주세요.
-
----
-
----
-
-## 무료로 계속 운영하기: Cloudflare Pages로 옮기기 (추천)
-
-Netlify 무료 요금제는 배포 1번에 15크레딧(월 300)을 써서, 자주 고치면 한도가 금방 찹니다(넘어도 요금은 없고 사이트가 멈춤). Cloudflare Pages는 무료로 정적 사이트의 방문자 트래픽에 제한·요금이 없고, 한 달에 빌드 500번까지 무료라 이 사이트에 더 잘 맞습니다.
-
-1. **https://dash.cloudflare.com/sign-up** 에서 무료로 가입합니다(이메일 인증).
-2. 왼쪽 메뉴 **Workers & Pages** → **Create** → **Pages** 탭 → **Connect to Git**를 누릅니다.
-3. **GitHub** 연결을 허용하고(비공개 저장소도 됨), 저장소 목록에서 **aidam**을 고른 뒤 **Begin setup**을 누릅니다.
-4. 설정 화면에 아래처럼 넣습니다.
-   - Framework preset: **None**
-   - Build command: `pnpm test && pnpm build`
-   - Build output directory: `apps/web/dist`
-   - **Environment variables**에 두 개 추가: `NODE_VERSION` = `22`, `PNPM_VERSION` = `10.12.1`
-5. **Save and Deploy**를 누르고 2~3분 기다리면 `https://aidam-xxx.pages.dev` 주소가 생깁니다.
-6. Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 새 주소(`aidam-xxx.pages.dev`)를 추가합니다(구글 로그인용).
-7. 잘 되면 Netlify 사이트는 지워도 됩니다(Site configuration → Delete site). 그 뒤로는 GitHub에 올릴 때마다 Cloudflare가 무료로 자동 배포합니다.
-
-보안 헤더는 `apps/web/public/_headers` 파일에 있어 두 곳 모두에서 그대로 적용됩니다.
+배포가 실패하면 **Actions** 탭에서 빨간 항목을 눌러 로그를 복사해 Claude에게 보여 주세요.
 
 ---
 

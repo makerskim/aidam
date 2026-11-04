@@ -50,7 +50,7 @@ const EMPTY: Draft = {
   count: 1,
   kidMode: 'set',
   gender: 'female',
-  kids: [kid(), kid(), kid()],
+  kids: [kid(), kid(), kid(), kid()],
   birth: EMPTY_BIRTH,
   prefs: DEFAULT_PREFS,
   fixedHangul: '',
@@ -69,7 +69,7 @@ function fromState(s: NameState): Draft {
     count: kids.length > 1 ? kids.length : 1,
     kidMode: s.kidMode ?? 'set',
     gender: s.gender,
-    kids: [...kids, kid(), kid(), kid()].slice(0, 3),
+    kids: [...kids, kid(), kid(), kid(), kid()].slice(0, 4),
     birth: draftFromBirth(s.birth),
     prefs: s.prefs,
     fixedHangul: s.prefs.fixed?.hangul ?? '',
@@ -132,8 +132,9 @@ export function NameWizard() {
     if (nextStep) go(nextStep, patch);
   };
   const multi = draft.purpose === 'new' && draft.count > 1;
-  const kids = draft.kids.slice(0, draft.count);
-  const setKid = (i: number, patch: Partial<Kid>) => setDraft({ kids: draft.kids.map((k, j) => (j === i ? { ...k, ...patch } : k)) });
+  const allKids = [...draft.kids, kid(), kid(), kid(), kid()].slice(0, 4);
+  const kids = allKids.slice(0, draft.count);
+  const setKid = (i: number, patch: Partial<Kid>) => setDraft({ kids: allKids.map((k, j) => (j === i ? { ...k, ...patch } : k)) });
   const birthResult = multi ? birthFromDraft({ ...draft.birth, timeKnown: false }) : birthFromDraft(draft.birth);
   const fixedSyl = [...draft.fixedHangul.replace(/[^가-힣]/g, '')][0];
   const syllables = [...draft.givenText.replace(/[^가-힣]/g, '')].slice(0, 4);
@@ -279,6 +280,7 @@ export function NameWizard() {
                   [1, '한 명'],
                   [2, '쌍둥이'],
                   [3, '세쌍둥이'],
+                  [4, '네쌍둥이'],
                 ] as const
               ).map(([n, label]) => (
                 <button key={n} type="button" className="tile" aria-pressed={draft.count === n} onClick={() => setDraft({ count: n })}>

@@ -572,11 +572,11 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
   rows.push({
     key: 'strength',
     title: '타고난 힘',
-    summary: `${STRENGTH_SHORT[lv]}이에요 (나를 돕는 기운 ${Math.round(a.strength.ratio * 100)}%)`,
+    summary: `${STRENGTH_SHORT[lv]}이에요`,
     verdict: sv,
     verdictText: sv === 'good' ? '균형' : lv === 'strong' || lv === 'veryStrong' ? '강함' : '약함',
     detail: [
-      `태어난 날의 기운(${WORD[a.dayMaster]})을 돕는 기운과 힘을 빼는 기운을 견주어 봐요.`,
+      `나를 돕는 기운이 ${Math.round(a.strength.ratio * 100)}%예요. 태어난 날의 기운(${el(a.dayMaster)})을 돕는 기운과 힘을 빼는 기운을 견주어 봐요.`,
       lv === 'balanced'
         ? '양쪽이 비슷해 균형이 잡힌 사주예요.'
         : lv === 'strong' || lv === 'veryStrong'
@@ -605,7 +605,7 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
   rows.push({
     key: 'need',
     title: '이름에 담을 기운',
-    summary: `${el(a.yongsin)}${a.huisin !== a.yongsin ? ` · ${el(a.huisin)}` : ''}`,
+    summary: a.huisin !== a.yongsin ? `${el(a.yongsin)}${josa(WORD[a.yongsin], '과', '와')} ${el(a.huisin)} 기운이 필요해요` : `${el(a.yongsin)} 기운이 필요해요`,
     verdict: null,
     verdictText: '',
     detail: [sajuNarrative(a), ...(ORDER.some((e) => a.roles[e] === 'gi') ? [`${ORDER.filter((e) => a.roles[e] === 'gi' || a.roles[e] === 'gu').map(el).join(', ')} 기운은 이름에 넣지 않는 게 좋아요.`] : [])].map(tidy),

@@ -112,13 +112,6 @@ interface Ui {
   picks: string[];
 }
 
-const GRADES = [
-  { value: '', label: '전체' },
-  { value: 'S', label: 'S' },
-  { value: 'A', label: 'A' },
-  { value: 'B', label: 'B' },
-  { value: 'CD', label: 'C 이하' },
-];
 
 export function Results() {
   const { search } = useLocation();
@@ -192,9 +185,11 @@ export function Results() {
 
   const tabIndex = Number(ui.tab) || 0;
 
-  /** 목록 걸러내기: 등급·고치기 옵션 */
+  /** 추천은 S등급만(하나도 없을 때만 A등급까지). 고치기 옵션이 있으면 그 항목이 좋은 이름만 */
+  const topGrade = (recs: Recommendation[]): 'S' | 'A' => (recs.some((r) => r.report.score.grade === 'S') ? 'S' : 'A');
   const filterList = (recs: Recommendation[], saju: SajuAnalysis | null) => {
-    let list = recs.filter((r) => !ui.grade || ui.grade.includes(r.report.score.grade));
+    const g = topGrade(recs);
+    let list = recs.filter((r) => r.report.score.grade === 'S' || (g === 'A' && r.report.score.grade === 'A'));
     if (fix && fix !== 'clean') list = list.filter((r) => explainCriteria(r.report, saju).find((c) => c.key === fix)?.verdict === 'good');
     if (fix === 'clean') list = list.filter((r) => shortTags(r.report, saju).caution === 0);
     return ui.sort === 'name' ? [...list].sort((a, b) => (a.hangul < b.hangul ? -1 : a.hangul > b.hangul ? 1 : 0)) : list;
@@ -249,20 +244,14 @@ export function Results() {
           />
         </div>
         <div className="res-filters">
-          <div className="chips" role="group" aria-label="등급">
-            {GRADES.map((g) => (
-              <button key={g.value} type="button" className="choice" aria-pressed={ui.grade === g.value} onClick={() => setUi({ grade: g.value, shown: PAGE })}>
-                {g.label}
-              </button>
-            ))}
-          </div>
+          <span className="small muted">{topGrade(recs) === 'S' ? 'S등급(90점 이상) 이름만 골랐어요' : 'S등급 이름이 없어 A등급(80점 이상)까지 보여 드려요'}</span>
           {fix ? (
             <button type="button" className="chip chip-primary fix-chip" onClick={() => navigate(`/results?s=${sKey}`, { replace: true })}>
               {FIX_LABEL[fix]} ✕
             </button>
           ) : null}
         </div>
-        {list.length === 0 ? <p className="muted">조건에 맞는 이름이 없어요. 다른 등급을 골라 보세요.</p> : null}
+        {list.length === 0 ? <p className="muted">조건에 맞는 이름이 없어요. 조건을 바꿔 보세요.</p> : null}
         <div className="list-anim stack" style={{ gap: 10 }}>
           {list.slice(0, ui.shown).map((r, i) => (
             <NameCard key={r.hanja} rec={r} rank={ui.sort === 'score' ? i + 1 : undefined} to={`/report?${reportQuery(state, r, kidIndex)}`} onOpen={remember} pick={pickFor(kidIndex, r)} />
@@ -278,7 +267,7 @@ export function Results() {
   };
 
   const count = state.kids?.length ?? 1;
-  const title = count === 2 ? '쌍둥이 이름 추천' : count === 3 ? '세쌍둥이 이름 추천' : '아기 이름 추천';
+  const title = count === 2 ? '쌍둥이 이름 추천' : count === 3 ? '세쌍둥이 이름 추천' : count === 4 ? '네쌍둥이 이름 추천' : '아기 이름 추천';
   const GENDER = { female: '여자아이', male: '남자아이', unknown: '성별 모름' } as const;
   const b = state.birth;
   const metaLine = [
@@ -380,7 +369,7 @@ export function Results() {
                   어울리는 이름 세트 <span className="num muted">{data.sets.length}</span>
                 </h2>
                 {data.sets.length === 0 ? <p className="muted">조건에 맞는 세트가 없어요. 조건을 바꿔 보세요.</p> : null}
-                {data.sets.map((set, si) => (
+                {(data.sets.some((st) => st.names.every((n) => n.report.score.grade === 'S')) ? data.sets.filter((st) => st.names.every((n) => n.report.score.grade === 'S')) : data.sets).map((set, si) => (
                   <article key={si} className="set-card">
                     <div className="set-head">
                       <span className={`rank ${si < 3 ? 'top' : ''}`}>{si + 1}</span>

@@ -1,5 +1,6 @@
 import type { PairHarmony } from '@aidam/engine';
 import { KID_LABELS } from '../lib/state';
+import { Rich } from './rich';
 
 type Tone = 'good' | 'ok' | 'bad';
 interface Row {
@@ -68,7 +69,9 @@ export function HarmonyView({ pairs, names }: { pairs: PairHarmony[]; names: str
                   {TONE_MARK[r.tone]}
                 </span>
                 <span className="hm-label">{r.label}</span>
-                {r.text}
+                <span>
+                  <Rich text={r.text} />
+                </span>
               </li>
             ))}
           </ul>

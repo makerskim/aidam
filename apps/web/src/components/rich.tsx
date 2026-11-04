@@ -16,6 +16,8 @@ const RULES: { re: RegExp; cls: (m: RegExpExecArray) => string }[] = [
   { re: /(?:좋은 수|살려 줘요|살려 주는|채워 줘요|채워 주|균형이 맞아요|부딪히지 않아요|없어서 좋아요|조화로워요|부르기 편해요)/y, cls: () => 'rx-good' },
   { re: /(?:초년운|청년운|장년운|말년·총운|용신|희신|해례본|운해본|81수리)/y, cls: () => 'rx-key' },
   { re: /\d+수/y, cls: () => 'rx-key' },
+  { re: /\d+(?:%|점|획)/y, cls: () => 'rx-num' },
+  { re: /(?:필요해요|넉넉해|많아요|없어요|센 편|여린 편|고르게 잡힌 편|아주 센 편|아주 여린 편)/y, cls: () => 'rx-num' },
 ];
 
 export function Rich({ text }: { text: string }) {

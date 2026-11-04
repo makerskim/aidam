@@ -664,12 +664,8 @@ export function HanjaPicker({
   return (
     <div className="stack">
       <div className="hanja-grid" role="group" aria-label={`${syllable} 한자`}>
-        <button type="button" className="hanja-opt" aria-pressed={value === null} onClick={() => onChange(null)}>
-          <span className="big">{syllable}</span>
-          <span className="m">한글만</span>
-        </button>
         {shown.map((o) => (
-          <button key={o.ch} type="button" className="hanja-opt" aria-pressed={value === o.ch} onClick={() => onChange(o.ch)}>
+          <button key={o.ch} type="button" className="hanja-opt" aria-pressed={value === o.ch} onClick={() => onChange(value === o.ch ? null : o.ch)}>
             <span className="big">{o.ch}</span>
             <span className="m">{o.meaning.split(',')[0] || '—'}</span>
             <span className="row" style={{ justifyContent: 'center', gap: 4 }}>

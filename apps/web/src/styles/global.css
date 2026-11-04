@@ -96,9 +96,15 @@ p,
 li,
 dd,
 blockquote,
-.cr-text span,
 .fix-opt span {
   text-wrap: pretty;
+}
+/* 짧은 요약 한두 줄은 줄 길이를 고르게 나눈다 */
+.cr-text span,
+.harmony-rows li > span:last-child,
+.sp-title,
+.summary-lead {
+  text-wrap: balance;
 }
 a {
   color: inherit;
@@ -1683,6 +1689,7 @@ img {
 .rx-good { color: var(--good); }
 .rx-bad { color: var(--bad); }
 .rx-key { color: #4a3aa8; }
+.rx-num { font-weight: 800; color: var(--ink); }
 .summary-body {
   font-size: 16px;
   line-height: 1.75;
@@ -1970,6 +1977,29 @@ img {
   gap: 8px;
   min-width: 150px;
 }
+.why-diff {
+  padding: 18px 22px;
+}
+.why-diff summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--ink);
+}
+.why-diff ul {
+  margin-top: 12px;
+}
+.about-panel b,
+.why-diff b {
+  color: var(--ink);
+  font-weight: 800;
+}
+.verdict-line {
+  font-size: 15px;
+  font-weight: 800;
+}
+.verdict-line.good { color: var(--good); }
+.verdict-line.ok { color: var(--ok); }
+.verdict-line.bad { color: var(--bad); }
 .rank-badge {
   font-size: 14px;
   font-weight: 800;
