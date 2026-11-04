@@ -36,11 +36,12 @@ export function Report() {
     );
   }
   return (
-    <main className="container page stack-lg">
+    <main className="container page">
+      <div className="read stack-lg">
       {error ? <ErrorText>{error}</ErrorText> : null}
       {!error ? (
-        <Staged steps={['사주를 세우고 있어요', '한자의 뜻과 기운을 살피고 있어요', '획수와 소리를 따져 보고 있어요']} done={Boolean(data)}>
-          {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} clan={state.surname.bongwan} /> : null}
+        <Staged steps={['사주 세우는 중', '한자의 뜻과 기운 보는 중', '획수와 소리 따져 보는 중']} done={Boolean(data)}>
+          {data ? <ReportView report={data.report} saju={data.saju} better={data.better} query={toQuery(state)} /> : null}
         </Staged>
       ) : null}
       <div className="row">
@@ -49,6 +50,7 @@ export function Report() {
         </Link>
       </div>
       <Disclaimer />
+      </div>
     </main>
   );
 }

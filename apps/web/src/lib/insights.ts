@@ -219,6 +219,9 @@ const josa = (word: string, a: string, b: string) => {
   return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? a : b;
 };
 
+/** 문장 끝 두 낱말을 붙여, 마지막 줄에 한두 글자만 떨어지지 않게 한다 */
+export const tidy = (text: string): string => text.replace(/ (\S+)$/, '\u00a0$1');
+
 /** 사주 풀이 (2~3문장) */
 export function sajuNarrative(a: SajuAnalysis): string {
   const img = DAY_MASTER_IMAGE[a.pillars.day.stem] ?? '';
@@ -235,7 +238,7 @@ export function sajuNarrative(a: SajuAnalysis): string {
     parts.push(`기운이 고르게 잡힌 사주라, ${lacking.length ? `조금 모자란 ${lacking.map((e) => WORD[e]).join('·')}을 채워 ` : ''}균형을 지켜 주면 좋아요.`);
   }
   parts.push(`${WORD[a.yongsin]}${josa(WORD[a.yongsin], '은', '는')} ${VIRTUE[a.yongsin]}을 뜻해요. 이름에 이 기운을 담아 아이의 삶에 균형을 더해 주세요.`);
-  return parts.join(' ');
+  return tidy(parts.join(' '));
 }
 
 /** 이 이름을 추천하는 까닭 (작명가의 한마디) */
@@ -302,6 +305,8 @@ export interface Criterion {
   cons: string[];
   score: number | null;
   max: number;
+  /** 한 줄 요약 (목록·총평용) */
+  summary: string;
 }
 
 const verdictOf = (ratio: number | null): Verdict => (ratio === null ? 'ok' : ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'ok' : 'bad');
@@ -348,6 +353,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       cons,
       score: report.resource.length ? s.resource : null,
       max: 30,
+      summary: '',
     });
   }
 
@@ -382,6 +388,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       cons,
       score: s.sound,
       max: 20,
+      summary: '',
     });
   }
 
@@ -407,6 +414,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       cons,
       score: report.frames ? s.suri : null,
       max: 25,
+      summary: '',
     });
   }
 
@@ -432,6 +440,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       cons,
       score: s.yinyang,
       max: 10,
+      summary: '',
     });
   }
 
@@ -461,7 +470,72 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       cons,
       score: s.practical,
       max: 15,
+      summary: '',
     });
   }
+  for (const c of out) {
+    c.summary = criterionSummary(c, report, a);
+    c.why = tidy(c.why);
+    c.pros = c.pros.map(tidy);
+    c.cons = c.cons.map(tidy);
+  }
   return out;
+}
+
+/** 기준별 한 줄 요약 */
+function criterionSummary(c: Criterion, report: NameReport, a: SajuAnalysis | null): string {
+  switch (c.key) {
+    case 'yongsin': {
+      if (!a) return '생일을 넣으면 볼 수 있어요';
+      if (!report.resource.length) return '한자를 고르면 볼 수 있어요';
+      const fill = [...new Set(report.resource.filter((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui').map((r) => PLAIN[r.element]))];
+      const clash = report.resource.some((r) => a.roles[r.element] === 'gi' || a.roles[r.element] === 'gu');
+      if (c.verdict === 'good') return `필요한 ${fill.join('·')} 기운을 채워요`;
+      if (clash) return '사주에 넘치는 기운이 섞였어요';
+      return fill.length ? `필요한 ${fill.join('·')} 기운을 조금 채워요` : '필요한 기운을 채우지 못해요';
+    }
+    case 'sound': {
+      const flow = report.soundBySchool[report.options.soundSchool];
+      if (flow.pairs.some((p) => p.kind === 'clash')) return '서로 누르는 소리가 있어요';
+      return c.verdict === 'good' ? '소리가 서로 살려 줘요' : '소리 흐름이 무난해요';
+    }
+    case 'suri': {
+      if (!report.frames) return '한자를 고르면 볼 수 있어요';
+      const bad = report.frameResults.filter((f) => f.info.luck === 'bad');
+      if (bad.length) return `${bad.map((f) => FRAME_KO[f.key].period).join('·')} 획수가 아쉬워요`;
+      return c.verdict === 'good' ? '초년부터 말년까지 좋은 수예요' : '반반인 수가 섞였어요';
+    }
+    case 'yinyang': {
+      if (c.verdict === 'good') return '음양이 고르게 섞였어요';
+      if (report.strokeYinYang && !report.strokeYinYang.balanced) return '획수가 홀수나 짝수로만 쏠렸어요';
+      if (report.vowel.level === 'unbalanced') return '모음 소리가 한쪽으로 쏠렸어요';
+      return '음양이 조금 기울었어요';
+    }
+    default: {
+      if (report.chars.some((h) => h?.negative)) return '피하는 뜻의 한자가 있어요';
+      const pron = report.pronunciation.join('');
+      if (pron !== report.fullHangul) return `실제로는 [${pron}]으로 소리 나요`;
+      return c.verdict === 'good' ? '뜻이 좋고 부르기 편해요' : '뜻과 발음이 무난해요';
+    }
+  }
+}
+
+/** 총평: 좋은 점·아쉬운 점 한 줄씩 */
+export function nameHighlights(criteria: Criterion[]): { good: string[]; bad: string[] } {
+  return {
+    good: criteria.filter((c) => c.verdict === 'good').map((c) => c.summary),
+    bad: criteria.filter((c) => c.verdict !== 'good' && c.score !== null).map((c) => c.summary),
+  };
+}
+
+/** 사주 한눈 요약 */
+export function sajuBrief(a: SajuAnalysis): { title: string; need: Element[]; many: Element[]; few: Element[] } {
+  const img = DAY_MASTER_IMAGE[a.pillars.day.stem] ?? '';
+  const season = SEASON(a.pillars.month.branch);
+  return {
+    title: `${season}에 태어난 ${img} 같은 아이`,
+    need: [a.yongsin, a.huisin],
+    many: ORDER.filter((e) => a.power[e] >= 30),
+    few: ORDER.filter((e) => a.counts[e] === 0 || a.power[e] < 10),
+  };
 }

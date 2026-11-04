@@ -6,12 +6,10 @@ export const STATE_VERSION = 1;
 export interface SurnameSel {
   hangul: string;
   hanja: string;
-  /** 본관 (예: 김해). 표시용이며 점수에는 쓰지 않는다 */
-  bongwan?: string;
 }
 
-/** "김해 김씨" / "김씨" */
-export const surnameLabel = (s: SurnameSel): string => `${s.bongwan ? `${s.bongwan} ` : ''}${s.hangul}씨`;
+/** "김씨" */
+export const surnameLabel = (s: SurnameSel): string => `${s.hangul}씨`;
 
 interface Common {
   v: number;
@@ -26,12 +24,14 @@ export interface KidInput {
   time: { hour: number; minute: number } | null;
 }
 
-/** 작명(추천) 입력. kids가 2명 이상이면 다둥이 세트로 짓는다 */
+/** 작명(추천) 입력. kids가 2명 이상이면 다둥이 */
 export interface NameState extends Common {
   gender: Gender;
   birth: BirthInput | null;
   prefs: Preferences;
   kids?: KidInput[];
+  /** 다둥이: set=서로 어울리는 세트로, each=아이마다 따로 (기본 set) */
+  kidMode?: 'set' | 'each';
 }
 
 export const KID_LABELS = ['첫째', '둘째', '셋째', '넷째'];

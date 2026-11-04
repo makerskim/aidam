@@ -68,12 +68,22 @@ export const api = {
     const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 10);
     return { sajus, sets };
   },
+  /** 다둥이를 아이마다 따로: 아이별 사주로 각각 추천 */
+  recommendEach(state: NameState) {
+    const kids = state.kids ?? [];
+    return kids.map((k, i) => {
+      const birth = state.birth ? { ...state.birth, time: k.time } : null;
+      const saju = birth ? computeSaju(birth, state.sajuOpts) : null;
+      const recs = recommendNames({ surname: surnameChars(state.surname), gender: k.gender, saju: saju?.primary ?? null, prefs: state.prefs, options: state.school, limit: 100 });
+      return { label: KID_LABELS[i] ?? `${i + 1}`, gender: k.gender, saju, recs };
+    });
+  },
   analyze(state: AnalyzeState) {
     const saju = state.birth ? computeSaju(state.birth, state.sajuOpts) : null;
     const input = { surname: surnameChars(state.surname), given: state.given, gender: state.gender };
     const report = analyzeName(input, saju?.primary ?? null, state.school);
     const allHanja = state.given.every((g) => g.hanja);
-    const better = allHanja ? suggestBetterHanja(input, saju?.primary ?? null, state.school, 3) : [];
+    const better = allHanja ? suggestBetterHanja(input, saju?.primary ?? null, state.school, 20) : [];
     return { saju, report, better };
   },
   /** 셀프 작명용 한자 후보 (친숙·좋은 뜻·인명용 순) */

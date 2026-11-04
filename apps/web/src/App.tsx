@@ -1,5 +1,5 @@
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
-import { HashRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter, Link, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { Landing } from './pages/Landing';
 import { NameWizard } from './pages/NameWizard';
 import { Results } from './pages/Results';
@@ -7,6 +7,7 @@ import { Report } from './pages/Report';
 import { SelfAnalyze } from './pages/SelfAnalyze';
 import { MyNames } from './pages/MyNames';
 import { SettingsPage } from './pages/Settings';
+import { SajuPage } from './pages/Saju';
 import { LibraryProvider, useLibrary } from './lib/library';
 import { GateProvider, useGate } from './lib/gate';
 
@@ -33,9 +34,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 
 function ScrollTop() {
   const { pathname } = useLocation();
+  const navType = useNavigationType();
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    // 뒤로 가기(POP)는 각 화면이 보던 자리를 되살린다
+    if (navType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, navType]);
   return null;
 }
 
@@ -83,7 +86,7 @@ function AccountMenu() {
             내 이름함
           </button>
           <button type="button" role="menuitem" onClick={() => go('/self')}>
-            지은 이름 풀어보기
+            정한 이름 풀어보기
           </button>
           <button type="button" role="menuitem" onClick={() => go('/settings')}>
             설정
@@ -145,7 +148,7 @@ export function AboutPanel() {
       <p>
         인명용 한자·음·획수 Unicode Unihan Database · 한자 훈음 libhangul · 절기 astronomy-engine · 음력 한국천문연구원 데이터 · 표준시 IANA tz · 글꼴 Pretendard
       </p>
-      <p className="tiny muted">전통 성명학에 따른 참고 정보예요. 출생신고 전 대법원 인명용 한자를 확인하세요. 같은 정보를 넣으면 언제나 같은 결과가 나와요.</p>
+      <p className="tiny muted">전통 성명학에 따른 참고 정보예요. 출생신고 전에 대법원 인명용 한자인지 확인하세요. 같은 정보를 넣으면 언제나 같은 결과가 나와요.</p>
     </div>
   );
 }
@@ -172,7 +175,7 @@ function RequireUser({ children }: { children: ReactNode }) {
   return (
     <main className="container narrow page stack" style={{ alignItems: 'flex-start' }}>
       <h1>로그인이 필요해요</h1>
-      <p style={{ color: 'var(--text-2)' }}>지은 이름 풀어보기와 내 이름함은 로그인하면 쓸 수 있어요.</p>
+      <p style={{ color: 'var(--text-2)' }}>내 이름함은 로그인하면 쓸 수 있어요.</p>
       <button type="button" className="btn btn-primary" onClick={gate.openLogin}>
         로그인
       </button>
@@ -191,6 +194,7 @@ function Shell() {
           <Route path="/name" element={<NameWizard />} />
           <Route path="/results" element={<Results />} />
           <Route path="/report" element={<Report />} />
+          <Route path="/saju" element={<SajuPage />} />
           <Route path="/self" element={<RequireUser><SelfAnalyze /></RequireUser>} />
           <Route path="/me" element={<RequireUser><MyNames /></RequireUser>} />
           <Route path="/settings" element={<RequireUser><SettingsPage /></RequireUser>} />

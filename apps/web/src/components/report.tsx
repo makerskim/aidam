@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { NameReport, Recommendation, SajuResult, PillarsResult } from '@aidam/engine';
 import { ELEMENT_HANJA, ELEMENTS, type Element } from '@aidam/engine/src/core/elements';
 import { BRANCHES, STEMS, branchElement, stemElement, ZODIAC_KO } from '@aidam/engine/src/core/ganji';
 import { meaningFor } from '../lib/format';
-import { explainCriteria, nameNarrative, PLAIN, sajuNarrative, sajuSummary, type Criterion } from '../lib/insights';
+import { explainCriteria, nameHighlights, PLAIN, sajuBrief, sajuNarrative, sajuSummary, type Criterion } from '../lib/insights';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { useCountUp } from '../lib/motion';
-import { fromSearch, toQuery, type AnalyzeState } from '../lib/state';
+import { DEFAULT_PREFS, fromSearch, STATE_VERSION, toQuery, type AnalyzeState, type NameState } from '../lib/state';
 import { Icon } from './ui';
 
-export function NameHero({ report, clan }: { report: NameReport; clan?: string }) {
+export function NameHero({ report }: { report: NameReport }) {
   const sur = report.input.surname.map((c, i) => ({ c, h: report.surnameChars[i] ?? null, sur: true }));
   const giv = report.input.given.map((c, i) => ({ c, h: report.chars[i] ?? null, sur: false }));
   return (
@@ -21,7 +21,6 @@ export function NameHero({ report, clan }: { report: NameReport; clan?: string }
           <span className="syl-ko">{c.hangul}</span>
           <span className="syl-hanja">{c.hanja ?? '–'}</span>
           {!isSur && h ? <span className="syl-meaning">{meaningFor(h.meaning, c.hangul)}</span> : null}
-          {isSur && i === 0 && clan ? <span className="syl-meaning">{clan} {report.input.surname.map((x) => x.hangul).join('')}씨</span> : null}
         </div>
       ))}
     </div>
@@ -35,93 +34,7 @@ function CountUp({ value }: { value: number }) {
 
 const VERDICT_CLS = { good: 'good', ok: 'ok', bad: 'bad' } as const;
 
-/** 점수표: 기준·한 줄 평가·점수 막대 */
-export function ScoreTable({ criteria, total }: { criteria: Criterion[]; total: number }) {
-  return (
-    <div className="table-wrap">
-      <table className="compare" aria-label="점수표">
-        <thead>
-          <tr>
-            <th scope="col">기준</th>
-            <th scope="col">평가</th>
-            <th scope="col" style={{ textAlign: 'right' }}>
-              점수
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {criteria.map((c) => (
-            <tr key={c.key}>
-              <td>{c.title}</td>
-              <td>
-                <span className={`verdict ${VERDICT_CLS[c.verdict]}`} style={{ padding: '3px 10px', fontSize: 14 }}>
-                  {c.verdictText}
-                </span>
-              </td>
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                {c.score === null ? (
-                  <span className="muted">–</span>
-                ) : (
-                  <>
-                    <b style={{ color: 'var(--ink)' }}>{c.score}</b>
-                    <span className="muted"> / {c.max}</span>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-          <tr>
-            <td>합계</td>
-            <td />
-            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-              <b style={{ color: 'var(--ink)', fontSize: 18 }}>{total}</b>
-              <span className="muted"> / 100</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-export function CriterionCard({ c }: { c: Criterion }) {
-  const ratio = c.score === null ? 0 : c.score / c.max;
-  return (
-    <article className="crit">
-      <div className="crit-head">
-        <h3>{c.title}</h3>
-        <span className={`verdict ${VERDICT_CLS[c.verdict]}`}>{c.verdictText}</span>
-      </div>
-      {c.score !== null ? (
-        <div className="row" style={{ flexWrap: 'nowrap', gap: 12 }}>
-          <div className="meter" style={{ flex: 1 }}>
-            <i className={`${VERDICT_CLS[c.verdict]} grow-x`} style={{ width: `${Math.max(4, ratio * 100)}%` }} />
-          </div>
-          <span className="num small" style={{ fontWeight: 800, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
-            {c.score} / {c.max}
-          </span>
-        </div>
-      ) : null}
-      <p className="crit-why">{c.why}</p>
-      {c.pros.length ? (
-        <ul className="pc pros" aria-label="좋은 점">
-          {c.pros.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
-      ) : null}
-      {c.cons.length ? (
-        <ul className="pc cons" aria-label="아쉬운 점">
-          {c.cons.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
-      ) : null}
-    </article>
-  );
-}
-
-export function PillarTable({ base }: { base: PillarsResult }) {
+export function PillarTable({ base, small = false }: { base: PillarsResult; small?: boolean }) {
   const p = base.pillars;
   const cols = [
     { head: '태어난 시', pl: p.hour },
@@ -141,7 +54,7 @@ export function PillarTable({ base }: { base: PillarsResult }) {
       </div>
     );
   return (
-    <div className="pillars" aria-label="사주 원국(만세력)">
+    <div className={`pillars ${small ? 'pillars-sm' : ''}`} aria-label="사주 원국(만세력)">
       {cols.map((c) => (
         <div key={c.head} className="pillar-head">
           {c.head}
@@ -246,15 +159,178 @@ export function SajuCard({ saju }: { saju: SajuResult }) {
   );
 }
 
-export function ReportView({ report, saju, better, query, clan }: { report: NameReport; saju: SajuResult | null; better: Recommendation[]; query: string; clan?: string }) {
+/** 사주 한눈 요약 (자세히는 사주 페이지에서) */
+export function SajuBrief({ saju, label, detailTo, compact = false }: { saju: SajuResult; label?: string; detailTo: string; compact?: boolean }) {
+  const b = sajuBrief(saju.primary);
+  const chips = (els: Element[], cls: string) =>
+    els.map((e) => (
+      <span key={e} className={`chip ${cls}`}>
+        {PLAIN[e]}({ELEMENT_HANJA[e]})
+      </span>
+    ));
+  return (
+    <section className="card brief" aria-label={`${label ?? ''} 사주 요약`}>
+      <div className="brief-top">
+        <div>
+          <span className="section-kicker">{label ? `${label} 사주` : '사주 한눈에'}</span>
+          <h2 className="brief-title">{b.title}</h2>
+        </div>
+        {compact ? null : <PillarTable base={saju.base} small />}
+      </div>
+      <dl className="brief-rows">
+        <div>
+          <dt>이름에 담을 기운</dt>
+          <dd>{chips(b.need, 'chip-primary')}</dd>
+        </div>
+        {b.many.length ? (
+          <div>
+            <dt>많은 기운</dt>
+            <dd>{chips(b.many, '')}</dd>
+          </div>
+        ) : null}
+        {!compact && b.few.length ? (
+          <div>
+            <dt>부족한 기운</dt>
+            <dd>{chips(b.few, '')}</dd>
+          </div>
+        ) : null}
+      </dl>
+      <Link className="more-link" to={detailTo}>
+        사주 자세히 보기 {Icon.chevron}
+      </Link>
+    </section>
+  );
+}
+
+const SCORE_FIELD = { yongsin: 'resource', sound: 'sound', suri: 'suri', yinyang: 'yinyang', meaning: 'practical' } as const;
+
+/** 같은 소리의 다른 한자 링크 */
+function altQuery(cur: AnalyzeState, rec: Recommendation): string {
+  return toQuery({ ...cur, given: rec.report.input.given });
+}
+
+/** 아쉬운 항목을 고치는 방법 */
+function FixOptions({ c, report, better, cur, hasSaju, recommendTo }: { c: Criterion; report: NameReport; better: Recommendation[]; cur: AnalyzeState; hasSaju: boolean; recommendTo: (key: Criterion['key']) => string }) {
+  const field = SCORE_FIELD[c.key];
+  const alts = c.key === 'sound' ? [] : better.filter((b) => b.report.score[field] > report.score[field]).slice(0, 3);
+  const editTo = `/self?${toQuery(cur)}`;
+  return (
+    <div className="fix">
+      <p className="fix-title">이렇게 바꿔 보세요</p>
+      <div className="fix-list">
+        {c.key === 'yongsin' && !hasSaju ? (
+          <Link className="fix-opt" to={editTo}>
+            <b>생일을 넣고 다시 보기</b>
+            <span>사주에 맞는지까지 볼 수 있어요</span>
+            {Icon.chevron}
+          </Link>
+        ) : null}
+        {c.score === null && hasSaju ? (
+          <Link className="fix-opt" to={editTo}>
+            <b>한자 고르기</b>
+            <span>한자를 고르면 이 항목을 볼 수 있어요</span>
+            {Icon.chevron}
+          </Link>
+        ) : null}
+        {alts.map((b) => {
+          const meaning = b.report.chars.map((h, i) => (h ? meaningFor(h.meaning, b.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
+          return (
+            <Link key={b.hanja} className="fix-opt" to={`/report?${altQuery(cur, b)}`} replace>
+              <b>
+                {b.hanja} <span className="muted">같은 소리</span>
+              </b>
+              <span>
+                {meaning} · {c.title} {b.report.score[field]}/{c.max} · 총 {b.report.score.total}점
+              </span>
+              {Icon.chevron}
+            </Link>
+          );
+        })}
+        <Link className="fix-opt" to={recommendTo(c.key)}>
+          <b>이 문제가 없는 새 이름 추천받기</b>
+          <span>같은 생일로, 이 항목이 좋은 이름만 보여 드려요</span>
+          {Icon.chevron}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function CriterionRow({ c, children }: { c: Criterion; children?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ratio = c.score === null ? 0 : c.score / c.max;
+  return (
+    <article className={`crit-row ${open ? 'open' : ''}`}>
+      <button type="button" className="crit-sum" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={`vdot ${VERDICT_CLS[c.verdict]}`} aria-hidden="true" />
+        <span className="cr-text">
+          <b>{c.title}</b>
+          <span>{c.summary}</span>
+        </span>
+        <span className="cr-right">
+          <span className={`verdict ${VERDICT_CLS[c.verdict]}`}>{c.verdictText}</span>
+          {c.score !== null ? (
+            <span className="cr-score num">
+              {c.score}
+              <small>/{c.max}</small>
+            </span>
+          ) : null}
+        </span>
+        <span className="cr-chev" aria-hidden="true">
+          {Icon.down}
+        </span>
+      </button>
+      {c.score !== null ? (
+        <div className="meter cr-meter" aria-hidden="true">
+          <i className={VERDICT_CLS[c.verdict]} style={{ width: `${Math.max(4, ratio * 100)}%` }} />
+        </div>
+      ) : null}
+      {open ? (
+        <div className="crit-detail">
+          <p className="crit-why">{c.why}</p>
+          {c.pros.length ? (
+            <ul className="pc pros" aria-label="좋은 점">
+              {c.pros.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
+          {c.cons.length ? (
+            <ul className="pc cons" aria-label="아쉬운 점">
+              {c.cons.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
+          {children}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+const GRADE_LINE: Record<string, string> = {
+  S: '이 아이에게 아주 잘 맞는 이름이에요.',
+  A: '이 아이에게 잘 맞는 이름이에요.',
+  B: '무난하게 잘 맞는 이름이에요.',
+  C: '아쉬운 점이 몇 가지 있는 이름이에요.',
+  D: '아쉬운 점이 많은 이름이에요.',
+};
+
+export function ReportView({ report, saju, better, query }: { report: NameReport; saju: SajuResult | null; better: Recommendation[]; query: string }) {
   const lib = useLibrary();
   const gate = useGate();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const nav = (location.state ?? {}) as { from?: string; rank?: number };
+  const cur = fromSearch<AnalyzeState>(`?${query}`) as AnalyzeState;
   const key = report.fullHanja ?? report.fullHangul;
   const entry = { hangul: report.fullHangul, hanja: key, total: report.score.total, grade: report.score.grade, query };
   const saved = lib.isBookmarked(key, query);
   const [copied, setCopied] = useState(false);
   const a = saju?.primary ?? null;
   const criteria = explainCriteria(report, a);
+  const hl = nameHighlights(criteria);
   const { record } = lib;
 
   // 로그인했다면 풀어 본 이름을 '내 이름함 → 기록'에 자동 저장
@@ -275,92 +351,129 @@ export function ReportView({ report, saju, better, query, clan }: { report: Name
     }
   };
 
-  return (
-    <div className="split">
-      <aside className="sticky-col stack" style={{ gap: 24 }}>
-        <div className="card stack" style={{ gap: 20 }}>
-          <div className="between" style={{ alignItems: 'flex-start' }}>
-            <NameHero report={report} clan={clan} />
-            <div className="row" style={{ flexWrap: 'nowrap', gap: 0 }}>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-pressed={saved}
-                aria-label={saved ? '북마크 해제' : '북마크'}
-                onClick={() => (lib.user ? lib.toggleBookmark(entry) : gate.openLogin())}
-              >
-                {Icon.bookmark(saved)}
-              </button>
-              <button type="button" className="icon-btn" aria-label="공유하기" onClick={share}>
-                {Icon.share}
-              </button>
-            </div>
-          </div>
-          <div className="scoreline">
-            <b>
-              <CountUp value={report.score.total} />점
-            </b>
-            <span className="grade pop">{report.score.grade}</span>
-            {copied ? <span className="small muted">링크를 복사했어요</span> : null}
-          </div>
-          <blockquote className="expert">
-            <span className="expert-label">작명가의 한마디</span>
-            {nameNarrative(report, a)}
-          </blockquote>
-          {!lib.user ? <p className="small muted">로그인하지 않아 이 결과는 저장되지 않아요.</p> : null}
-        </div>
-        <div className="card stack">
-          <h3>점수표</h3>
-          <ScoreTable criteria={criteria} total={report.score.total} />
-        </div>
-      </aside>
+  /** 이 항목이 좋은 이름만 다시 추천 */
+  const recommendTo = (k: Criterion['key']) => {
+    const from = nav.from && nav.from.startsWith('/results') ? fromSearch<NameState>(nav.from.slice(nav.from.indexOf('?'))) : null;
+    const base: NameState = from && !(from.kids && from.kids.length > 1)
+      ? from
+      : {
+          v: STATE_VERSION,
+          surname: cur.surname,
+          gender: cur.gender,
+          birth: cur.birth,
+          prefs: { ...DEFAULT_PREFS, length: cur.given.length === 1 ? 1 : 2 },
+          school: cur.school,
+          sajuOpts: cur.sajuOpts,
+        };
+    return `/results?${toQuery(base)}&fix=${k}`;
+  };
+  const sajuTo = `/saju?${query}`;
 
-      <section className="stack" style={{ gap: 18 }} aria-label="기준별 풀이">
-        <div>
-          <span className="section-kicker">기준별 풀이</span>
-          <h2 style={{ marginTop: 4 }}>무엇이 좋고, 무엇이 아쉬운지</h2>
-        </div>
-        <div className="stack list-anim" style={{ gap: 16 }}>
-          {criteria.map((c) => (
-            <CriterionCard key={c.key} c={c} />
-          ))}
-        </div>
-        {saju ? <SajuCard saju={saju} /> : null}
-        {better.length ? (
-          <div className="stack" style={{ gap: 12 }}>
-            <h2>같은 소리, 더 좋은 한자</h2>
-            <div className="list">
-              {better.map((b) => (
-                <BetterRow key={b.hanja} rec={b} />
-              ))}
-            </div>
+  return (
+    <div className="report stack-lg">
+      {nav.from ? (
+        <button type="button" className="back-link" onClick={() => navigate(-1)}>
+          {Icon.back} 추천 목록으로
+        </button>
+      ) : null}
+
+      <section className="card hero-card">
+        <div className="hc-main">
+          <NameHero report={report} />
+          <div className="hc-actions">
+            <button type="button" className="icon-btn" aria-pressed={saved} aria-label={saved ? '북마크 해제' : '북마크'} onClick={() => (lib.user ? lib.toggleBookmark(entry) : gate.openLogin())}>
+              {Icon.bookmark(saved)}
+            </button>
+            <button type="button" className="icon-btn" aria-label="공유하기" onClick={share}>
+              {Icon.share}
+            </button>
           </div>
-        ) : null}
+        </div>
+        <div className="hc-score">
+          {nav.rank ? <span className="rank-badge">추천 {nav.rank}위</span> : null}
+          <b className="big-score">
+            <CountUp value={report.score.total} />
+            <small>점</small>
+          </b>
+          <span className={`grade-pill lg g-${report.score.grade}`}>{report.score.grade}등급</span>
+          {copied ? <span className="small muted">링크를 복사했어요</span> : null}
+        </div>
       </section>
+
+      <section className="card summary" aria-label="총평">
+        <span className="section-kicker">총평</span>
+        <p className="summary-lead">
+          {report.fullHangul}
+          {report.fullHanja ? <span className="muted"> {report.fullHanja}</span> : null}, {GRADE_LINE[report.score.grade] ?? ''}
+        </p>
+        <div className="hl">
+          {hl.good.length ? (
+            <div className="hl-col good">
+              <span className="hl-head">좋은 점</span>
+              <ul>
+                {hl.good.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {hl.bad.length ? (
+            <div className="hl-col bad">
+              <span className="hl-head">아쉬운 점</span>
+              <ul>
+                {hl.bad.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+        {!lib.user ? <p className="tiny muted">로그인하지 않아 이 결과는 저장되지 않아요.</p> : null}
+      </section>
+
+      <section className="stack" style={{ gap: 12 }} aria-label="항목별 풀이">
+        <div className="between">
+          <h2>항목별 풀이</h2>
+          <span className="small muted">눌러서 자세히 보기</span>
+        </div>
+        {criteria.map((c) => (
+          <CriterionRow key={c.key} c={c}>
+            {c.verdict !== 'good' ? <FixOptions c={c} report={report} better={better} cur={cur} hasSaju={Boolean(saju)} recommendTo={recommendTo} /> : null}
+          </CriterionRow>
+        ))}
+      </section>
+
+      {saju ? <SajuBrief saju={saju} detailTo={sajuTo} /> : null}
+
+      {better.length ? (
+        <section className="stack" style={{ gap: 12 }} aria-label="같은 소리 더 좋은 한자">
+          <h2>같은 소리, 점수가 더 높은 한자</h2>
+          <div className="stack" style={{ gap: 10 }}>
+            {better.slice(0, 3).map((b) => (
+              <BetterRow key={b.hanja} rec={b} to={`/report?${altQuery(cur, b)}`} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
 
-function betterQuery(rec: Recommendation): string {
-  const cur = fromSearch<AnalyzeState>(window.location.hash.split('?')[1] ?? '');
-  if (!cur) return '';
-  return toQuery({ ...cur, given: rec.report.input.given });
-}
-
-function BetterRow({ rec }: { rec: Recommendation }) {
+function BetterRow({ rec, to }: { rec: Recommendation; to: string }) {
   const meaning = rec.report.chars.map((h, i) => (h ? meaningFor(h.meaning, rec.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
   return (
-    <Link className="name-row" to={`/report?${betterQuery(rec)}`}>
-      <span className="who">
-        <span className="ko">{rec.hangul}</span>
-        <span className="hj">{rec.hanja}</span>
-        <span className="meaning">{meaning}</span>
+    <Link className="name-card nc-link solo" to={to} replace>
+      <span className="nc-main">
+        <span className="nc-name">
+          <b>{rec.hangul}</b>
+          <span className="hj">{rec.hanja}</span>
+        </span>
+        <span className="nc-meaning">{meaning}</span>
       </span>
-      <span className="score">
-        <b>{rec.report.score.total}</b>
-        <small>{rec.report.score.grade}등급</small>
+      <span className="nc-score">
+        <b className="num">{rec.report.score.total}</b>
+        <span className={`grade-pill g-${rec.report.score.grade}`}>{rec.report.score.grade}등급</span>
       </span>
-      {Icon.chevron}
     </Link>
   );
 }

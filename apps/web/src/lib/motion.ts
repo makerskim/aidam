@@ -74,7 +74,7 @@ export function useActiveStep(root: React.RefObject<HTMLElement | null>, selecto
       (entries) => {
         for (const e of entries) if (e.isIntersecting) setActive(steps.indexOf(e.target as HTMLElement));
       },
-      { rootMargin: '-45% 0px -45% 0px' },
+      { rootMargin: '-49% 0px -49% 0px' },
     );
     steps.forEach((s) => io.observe(s));
     return () => io.disconnect();

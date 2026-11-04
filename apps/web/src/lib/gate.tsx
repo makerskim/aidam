@@ -56,12 +56,12 @@ export function GateProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal open={state.open} onClose={close} labelledBy="gate-title">
         <h2 id="gate-title">{state.allowGuest ? '로그인하고 시작할까요?' : '로그인이 필요해요'}</h2>
-        <p style={{ color: 'var(--text-2)' }}>로그인하면 지은 이름이 내 이름함에 자동으로 저장되고, 북마크해 두고 언제든 다시 볼 수 있어요.</p>
+        <p style={{ color: 'var(--text-2)' }}>로그인하면 본 이름이 저장되고, 마음에 드는 이름을 모아 둘 수 있어요.</p>
         <button type="button" className="btn btn-lg btn-block google-btn" onClick={() => void login()}>
           {Icon.google}
           {lib.cloudConfigured ? 'Google로 계속하기' : '미리보기 계정으로 로그인'}
         </button>
-        {!lib.cloudConfigured ? <p className="tiny muted">Google 로그인은 연결 준비 중이에요. 지금은 미리보기 계정으로 이 기기에만 저장돼요.</p> : null}
+        {!lib.cloudConfigured ? <p className="tiny muted">미리보기에서는 이 기기에만 저장돼요.</p> : null}
         {lib.syncError ? <p className="error">{lib.syncError}</p> : null}
         {state.allowGuest ? (
           <div className="stack" style={{ gap: 6, alignItems: 'center' }}>
