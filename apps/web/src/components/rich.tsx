@@ -37,12 +37,24 @@ export function Rich({ text }: { text: string }) {
     if (hit) {
       if (plain) out.push(plain);
       plain = '';
-      out.push(
-        <b key={i} className={hit.cls}>
-          {text.slice(i, i + hit.len)}
-        </b>,
+      // 굵은 낱말 바로 뒤에 붙은 조사(로·와·을…)는 같은 줄에 두어 "65% / 로"처럼 떨어지지 않게 한다
+      let tail = '';
+      let j = i + hit.len;
+      while (j < text.length && /[가-힣]/.test(text[j] as string) && tail.length < 4) tail += text[j++];
+      const word = (
+        <b className={hit.cls}>{text.slice(i, i + hit.len)}</b>
       );
-      i += hit.len;
+      out.push(
+        tail ? (
+          <span key={i} className="nobr">
+            {word}
+            {tail}
+          </span>
+        ) : (
+          <Fragment key={i}>{word}</Fragment>
+        ),
+      );
+      i = j;
     } else {
       plain += text[i];
       i += 1;

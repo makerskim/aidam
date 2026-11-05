@@ -88,11 +88,17 @@ assert.ok(await page.locator('.saju-panel').count(), '만세력이 먼저 보이
 assert.equal(await page.locator('.name-card .chip').count(), 0, '목록 카드에 태그가 남아 있음');
 // 결과에는 이름 느낌·등급 버튼 없이 30개를 보여 준다
 assert.equal(await page.locator('.res-opt').count(), 0, '결과에 이름 느낌·등급 버튼이 남아 있음');
-assert.ok((await page.locator('.name-card').count()) >= 30, '추천이 30개보다 적음');
+assert.ok((await page.locator('.name-card').count()) >= 20, '추천이 20개보다 적음');
+{
+  // 점수순(기본): 점수가 높은 이름부터
+  const scores = (await page.locator('.name-card .nc-score b').allTextContents()).map(Number);
+  assert.deepEqual([...scores].sort((a, b) => b - a), scores, `점수순이 아님: ${scores.slice(0, 8)}`);
+  assert.equal(await page.locator('.seg button:has-text("추천순")').count(), 0, '추천순이 남아 있음');
+}
 assert.ok(/^\d+$/.test((await page.locator('.name-card .nc-score b').first().textContent()) ?? ''), '점수에 소수점');
 assert.equal((await page.locator('.name-card .rank').first().textContent())?.trim(), '1', '순위 표시');
 const listScore = (await page.locator('.name-card .nc-score b').first().textContent())?.trim();
-console.log(`✓ 사주 요약 + 추천 ${await page.locator('.name-card').count()}개 (1위 ${listScore}점)`);
+console.log(`✓ 사주 요약 + 추천 ${await page.locator('.name-card').count()}개 점수순 (1위 ${listScore}점)`);
 
 // 4) 리포트: 총평 → 항목 5개(눌러서 자세히) → 목록으로 돌아가기
 await page.evaluate(() => window.scrollTo(0, 400));
@@ -245,6 +251,7 @@ assert.notEqual(popularNames[0], uniqueNames[0], '이름 느낌을 바꿔도 첫
 assert.notEqual(popularNames[0], balancedNames[0], '요즘 많이 쓰는·무난한 첫 이름이 같음');
 assert.ok(balancedNames.slice(0, 20).filter((n) => popularNames.slice(0, 20).includes(n)).length <= 2, '요즘 많이 쓰는·무난한이 많이 겹침');
 const fixedNames = await single('무난한', ['희', '熙']);
+// 남자아이 이름에 여자 이름처럼 들리는 끝소리가 없어야 한다(성별 확인은 엔진 시뮬레이션 테스트에서 폭넓게)
 assert.ok(fixedNames.length > 0, '돌림자를 걸면 추천이 비어 있음');
 assert.ok(fixedNames.every((n) => n.trim().endsWith('희')), `돌림자 위치: ${fixedNames.slice(0, 3)}`);
 await page.fill('#fixed', '').catch(() => {});

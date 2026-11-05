@@ -50,10 +50,10 @@ describe('추천 한자는 이야기가 있는 글자에서', () => {
     }
     expect(storied / all).toBeGreaterThanOrEqual(0.98);
   });
-  it('추천은 30개 이상 나온다(돌림자가 있어도)', () => {
+  it('추천은 20개 이상 나온다(돌림자가 있어도)', () => {
     for (const fixed of [undefined, { position: 1, hangul: '현', hanja: '炫' }, { position: 0, hangul: '규', hanja: '奎' }]) {
       const r = recommendNames({ surname: [{ hangul: '박', hanja: '朴' }], gender: 'male', saju, prefs: { ...DEFAULT_PREFERENCES, ...(fixed ? { fixed } : {}) }, options: DEFAULT_SCHOOL_OPTIONS, limit: 100 });
-      expect(r.length, JSON.stringify(fixed)).toBeGreaterThanOrEqual(30);
+      expect(r.length, JSON.stringify(fixed)).toBeGreaterThanOrEqual(20);
     }
   });
 });

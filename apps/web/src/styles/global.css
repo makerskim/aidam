@@ -2165,8 +2165,8 @@ img {
 .cr-title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
 }
 .cr-title .verdict {
   min-height: 24px;
@@ -3418,4 +3418,12 @@ img {
   font-size: 26px;
   font-weight: 900;
   color: var(--ink);
+}
+
+/* 굵은 낱말과 뒤 조사를 한 줄에 (text-wrap: balance 규칙보다 앞서도록) */
+.nobr,
+.cr-text span.nobr,
+.harmony-rows li span.nobr {
+  white-space: nowrap;
+  text-wrap: nowrap;
 }

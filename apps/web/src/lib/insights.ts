@@ -800,7 +800,7 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
   rows.push({
     key: 'strength',
     title: '타고난 힘',
-    summary: `${STRENGTH_SHORT[lv]}이에요`,
+    summary: `나를 돕는 기운이 ${Math.round(a.strength.ratio * 100)}%로, 타고난 힘이 ${STRENGTH_SHORT[lv]}이에요`,
     verdict: sv,
     verdictText: sv === 'good' ? '균형' : lv === 'strong' || lv === 'veryStrong' ? '강함' : '약함',
     detail: [
@@ -820,12 +820,12 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
     title: '다섯 기운의 균형',
     summary:
       many.length && few.length
-        ? `${many.map((e) => WORD[e]).join('·')} 기운이 많고, ${few.map((e) => WORD[e]).join('·')} 기운이 없어요`
+        ? `${many.map((e) => `${WORD[e]} ${Math.round(a.power[e])}%`).join('·')}로 많고, ${few.map((e) => WORD[e]).join('·')} 기운은 사주에 없어요`
         : many.length
-          ? `${many.map((e) => WORD[e]).join('·')} 기운이 많아요`
+          ? `${many.map((e) => `${WORD[e]} 기운이 ${Math.round(a.power[e])}%`).join('·')}로 많아 한쪽으로 기울었어요`
           : few.length
-            ? `${few.map((e) => WORD[e]).join('·')} 기운이 없어요`
-            : '다섯 기운이 고루 있어요',
+            ? `${few.map((e) => WORD[e]).join('·')} 기운이 사주 여덟 글자에 하나도 없어요`
+            : '다섯 기운이 사주에 고루 들어 있어요',
     verdict: bv,
     verdictText: bv === 'good' ? '고름' : bv === 'ok' ? '조금 치우침' : '치우침',
     detail: ORDER.map((e) => `${el(e)} ${Math.round(a.power[e])}%${a.counts[e] === 0 ? ' · 사주에 없음' : a.power[e] >= 30 ? ' · 많음' : ''}`),
@@ -833,7 +833,7 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
   rows.push({
     key: 'need',
     title: '이름에 담을 기운',
-    summary: a.huisin !== a.yongsin ? `${el(a.yongsin)}${josa(WORD[a.yongsin], '과', '와')} ${el(a.huisin)} 기운이 필요해요` : `${el(a.yongsin)} 기운이 필요해요`,
+    summary: `${a.method === 'lacking' ? '사주에 적은 기운으로 보면' : '사주의 힘과 계절로 보면'} ${a.huisin !== a.yongsin ? `${el(a.yongsin)}${josa(WORD[a.yongsin], '과', '와')} ${el(a.huisin)}` : el(a.yongsin)} 기운이 필요해요`,
     verdict: null,
     verdictText: '',
     detail: [sajuNarrative(a), ...(ORDER.some((e) => a.roles[e] === 'gi') ? [`${ORDER.filter((e) => a.roles[e] === 'gi' || a.roles[e] === 'gu').map(el).join(', ')} 기운은 이름에 넣지 않는 게 좋아요.`] : [])].map(tidy),
@@ -843,7 +843,11 @@ export function sajuEval(saju: SajuResult): SajuRow[] {
     rows.push({
       key: 'boundary',
       title: '태어난 시각',
-      summary: saju.unknownTime ? '시각을 몰라 열두 때를 모두 따졌어요' : differs ? '경계에 가까워 결과가 달라질 수 있어요' : '경계에 가깝지만 필요한 기운은 같아요',
+      summary: saju.unknownTime
+        ? '태어난 시각을 몰라 열두 때를 모두 따져 가장 많이 나온 결과를 썼어요'
+        : differs
+          ? '시(時)의 경계에 가까워, 몇 분 차이로 필요한 기운이 달라질 수 있어요'
+          : '시(時)의 경계에 가깝지만, 어느 쪽으로 봐도 필요한 기운은 같아요',
       verdict: saju.unknownTime || differs ? 'ok' : 'good',
       verdictText: saju.unknownTime ? '시간 모름' : differs ? '확인 필요' : '안정',
       detail: saju.unknownTime

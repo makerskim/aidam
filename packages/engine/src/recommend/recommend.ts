@@ -98,6 +98,29 @@ function isRecent(hangul: string, gender: Gender): boolean {
   });
 }
 
+/** 남자아이 이름 끝에 오면 여자 이름처럼 들리는 글자 / 여자아이 이름 끝에 오면 남자 이름처럼 들리는 글자 */
+const FEMININE_LAST = new Set(['아', '나', '미', '라', '리', '린', '혜', '슬', '별', '설', '경', '연']);
+const MASCULINE_LAST = new Set(['준', '혁', '훈', '호', '철', '석', '범', '웅', '환', '건', '강', '찬']);
+const listed = (g: 'male' | 'female') => new Set([...COMMON_NAMES[g], ...POPULAR_NAMES[g], ...DISTINCT_NAMES[g]]);
+const MAIN = { male: new Set([...COMMON_NAMES.male, ...POPULAR_NAMES.male]), female: new Set([...COMMON_NAMES.female, ...POPULAR_NAMES.female]) };
+
+/**
+ * 성별에 맞는 이름인지. 남자아이에게 여자 이름처럼 들리는 이름(…아·…나·…경), 여자아이에게 남자 이름처럼 들리는 이름(…준·…혁·…호)은 뺀다.
+ * 그 성별에서 실제로 많이 쓰는 이름이면 그대로 둔다(하준·서준 같은 예외가 없도록).
+ */
+export function fitsGender(hangul: string, gender: Gender): boolean {
+  if (gender === 'unknown') return true;
+  const last = [...hangul].pop() ?? '';
+  if (MAIN[gender].has(hangul)) return true;
+  if (gender === 'male') return !FEMININE_LAST.has(last) && !(MAIN.female.has(hangul) && !listed('male').has(hangul));
+  return !MASCULINE_LAST.has(last) && !(MAIN.male.has(hangul) && !listed('female').has(hangul));
+}
+
+/** 남녀 모두 쓰는 이름(성별을 모를 때 먼저 고른다) */
+function isUnisex(hangul: string): boolean {
+  return listed('male').has(hangul) && listed('female').has(hangul);
+}
+
 /** 실제로 많이 쓰는 이름 목록(성별 모름이면 둘 다) */
 function knownNames(gender: Gender): Set<string> {
   const gs = gender === 'unknown' ? (['female', 'male'] as const) : ([gender] as const);
@@ -112,6 +135,12 @@ function knownNames(gender: Gender): Set<string> {
  */
 function styleTier(hangul: string, gender: Gender, style: Preferences['style']): number {
   if ([...hangul].length < 2) return 0;
+  // 성별을 모르면 남녀 모두 쓰는 이름을 먼저(그 안에서 느낌대로)
+  if (gender === 'unknown' && !isUnisex(hangul)) return 3 + styleTierOf(hangul, gender, style);
+  return styleTierOf(hangul, gender, style);
+}
+
+function styleTierOf(hangul: string, gender: Gender, style: Preferences['style']): number {
   const recent = isRecent(hangul, gender);
   const distinct = isDistinct(hangul, gender);
   const classic = isCommon(hangul, gender) && !recent;
@@ -136,9 +165,10 @@ function allowedAt(level: Level, weights: number[], hangul: string, known: Set<s
   return (level >= 2 && sum >= 5) || (level >= 3 && sum >= 3);
 }
 
-const GRADE_RANK: Record<string, number> = { S: 4, A: 3, B: 2, C: 1, D: 0 };
 /** 고를 거리가 되도록 적어도 이만큼은 보여 준다(limit보다 크면 limit) */
 const MIN_TOTAL = 30;
+/** 고른 느낌의 이름이 이만큼 있으면 다른 느낌 이름은 섞지 않는다 */
+const STYLE_ENOUGH = 20;
 
 interface HangulCandidate {
   syllables: string[];
@@ -169,8 +199,9 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
   // 점수만 보고 '수갑 추(杻)'처럼 이름에 쓰지 않는 글자가 끼는 것을 막는다.
   // 사주에 해가 되는 기운(기신·구신)의 한자는 쓰지 않는다
   const safeOf = (l: HanjaEntry[]) => (saju ? l.filter((h) => saju.roles[h.element] !== 'gi' && saju.roles[h.element] !== 'gu') : l);
-  const storied = safeOf(base.filter((h) => HANJA_STORY.has(h.ch)));
-  const list = storied.length > 0 ? storied : safeOf(base);
+  // 뜻 이야기를 써 둔 한자가 있는 소리는 그 안에서만 고른다(모두 사주에 해가 되면 이 소리는 쓰지 않는다)
+  const storiedAll = base.filter((h) => HANJA_STORY.has(h.ch));
+  const list = storiedAll.length > 0 ? safeOf(storiedAll) : safeOf(base);
   const key = (h: HanjaEntry) =>
     (FAMILIAR_HANJA.has(h.ch) ? 2 : 0) + (isPositiveMeaning(h.meaning) ? 1 : 0) + (h.edu ? 0.3 : 0) +
     (saju ? saju.favor[h.element] * (h.elementConfidence === 'C' ? 0.5 : 1) : 0);
@@ -186,7 +217,7 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
  * 1) 음절 조합 → 소리 규칙으로 한글 이름 상위 1,500개  2) 음절별 한자 상위 12개
  * 3) 4격·채점 → 한글 이름당 상위 2개 조합  4) 상위 후보를 정식 분석(analyzeName)으로 확정
  * 고른 이름 느낌의 실제 이름부터 찾고, 좋은 이름이 모자라면 한 단계씩 넓힌다(Level).
- * 순서: 이름 느낌 → 등급 → 점수. 고른 느낌의 이름이 30개 이상이면 그 이름만 낸다.
+ * 순서: 점수 높은 순. 고른 느낌의 이름이 20개 이상이면 그 이름만 낸다.
  */
 export function recommendNames(args: RecommendArgs): Recommendation[] {
   const { surname, gender, prefs, options } = args;
@@ -244,6 +275,9 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     if (include.length > 0 && !syl.some((s) => include.includes(s))) continue;
     const hangul = syl.join('');
     if (AWKWARD_NAMES.has(hangul)) continue;
+    // 돌림자가 이름 끝 글자면 부모가 정한 글자이므로 끝소리로 성별을 따지지 않는다
+    const fixedLast = prefs.fixed && Math.min(Math.max(0, prefs.fixed.position), syl.length - 1) === syl.length - 1;
+    if (!fixedLast && !fitsGender(hangul, gender)) continue;
     const all = [...surSyl, ...syl];
     if (teaseWord(all.join(''))) continue;
     const flow = soundFlow(all, options.soundSchool, options.includeFinalConsonant);
@@ -355,16 +389,19 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
         tier: b.known ? b.tier : 9,
       };
     });
+    // 보여 줄 순서는 점수 높은 순(같으면 느낌이 더 맞는 이름 먼저)
     out.sort(
       (a, b) =>
-        a.tier - b.tier ||
-        (GRADE_RANK[b.report.score.grade] ?? 0) - (GRADE_RANK[a.report.score.grade] ?? 0) ||
         b.report.score.total - a.report.score.total ||
+        a.tier - b.tier ||
         b.pref - a.pref ||
         cmpCodePoints(a.hangul, b.hangul) ||
         cmpCodePoints(a.hanja, b.hanja),
     );
-    return { out: out.slice(0, limit), size: kept.length };
+    // 실제로 쓰는 이름이 충분하면 목록에 없는 조합(넓혀 찾은 이름)은 뺀다
+    const real = out.filter((r) => r.fit !== 2);
+    const shown = real.length >= Math.min(STYLE_ENOUGH, limit) ? real : out;
+    return { out: shown.slice(0, limit), size: kept.length };
   };
 
   const sCount = (rs: Out[]) => new Set(rs.filter((r) => r.report.score.grade === 'S').map((r) => r.hangul)).size;
@@ -373,16 +410,19 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   for (const level of [0, 1, 2, 3] as const) {
     const { out, size } = run(level);
     last = out;
-    if (out.length < enough) continue;
-    // 고른 느낌의 이름만으로 30개가 넘으면 그 이름만 보여 준다(느낌마다 결과가 확실히 다르게)
-    if (level === 0) return strip(out);
+    if (level > 0 && out.length < enough) continue;
+    // 고른 느낌의 이름만으로 충분하면(STYLE_ENOUGH개 이상) 그 이름만 보여 준다(느낌마다 결과가 확실히 다르게)
+    if (level === 0 && out.length >= Math.min(STYLE_ENOUGH, limit)) return strip(out);
+    if (level === 0) continue;
     // 돌림자 등으로 실제 이름 후보가 너무 적으면(40개 미만) 흔한 음절 조합까지 본다
     if (level >= 1 && sCount(out) > 0 && (level >= 2 || size >= 40)) return strip(out);
   }
   // 넓혀도 모자라면 '아쉬운 이름 미리 빼기'를 풀어 찾은 이름을 뒤에 붙인다(조건을 지킨 이름이 먼저)
   if (last.length < enough && options.strictMode) {
     const seen = new Set(last.map((r) => r.hanja));
-    last = [...last, ...run(4).out.filter((r) => !seen.has(r.hanja))].slice(0, limit);
+    last = [...last, ...run(4).out.filter((r) => !seen.has(r.hanja))]
+      .sort((a, b) => b.report.score.total - a.report.score.total || a.tier - b.tier || cmpCodePoints(a.hanja, b.hanja))
+      .slice(0, limit);
   }
   return strip(last);
 }

@@ -50,18 +50,9 @@ describe('추천', () => {
       expect(r.report.score.passesStrict).toBe(true);
     }
   });
-  it('순서: 이름 느낌(fit) → 등급 → 점수', () => {
-    const rank: Record<string, number> = { S: 4, A: 3, B: 2, C: 1, D: 0 };
-    for (let i = 1; i < recs.length; i++) {
-      const a = recs[i - 1]!;
-      const b = recs[i]!;
-      expect(a.fit ?? 0).toBeLessThanOrEqual(b.fit ?? 0);
-      if (a.fit !== b.fit) continue;
-      const ga = rank[a.report.score.grade]!;
-      const gb = rank[b.report.score.grade]!;
-      expect(ga).toBeGreaterThanOrEqual(gb);
-      if (ga === gb) expect(a.report.score.total).toBeGreaterThanOrEqual(b.report.score.total);
-    }
+  it('순서: 점수 높은 순', () => {
+    const totals = recs.map((r) => r.report.score.total);
+    expect([...totals].sort((x, y) => y - x)).toEqual(totals);
   });
   it('추천 점수 = 같은 이름을 직접 풀어 본 점수 (이름 느낌을 바꿔도)', () => {
     for (const style of ['popular', 'unique'] as const) {
@@ -105,7 +96,7 @@ describe('어색한 이름 거르기', () => {
   for (const gender of ['female', 'male', 'unknown'] as const) {
     it(`${gender}: 낱말처럼 들리는 이름(하지·지하·이유·하수…)이 없다`, () => {
       const recs = recommendNames({ ...base, surname: jeong, gender, limit: 100 });
-      expect(recs.length).toBeGreaterThanOrEqual(30);
+      expect(recs.length).toBeGreaterThanOrEqual(20);
       for (const r of recs) expect(AWKWARD_NAMES.has(r.hangul.slice(1))).toBe(false);
     });
   }
@@ -113,7 +104,7 @@ describe('어색한 이름 거르기', () => {
     const known = new Set([...COMMON_NAMES.female, ...POPULAR_NAMES.female, ...DISTINCT_NAMES.female]);
     for (const style of ['popular', 'balanced', 'unique'] as const) {
       const recs = recommendNames({ ...base, surname: jeong, prefs: { ...DEFAULT_PREFERENCES, style }, limit: 100 });
-      expect(recs.length).toBeGreaterThan(40);
+      expect(recs.length).toBeGreaterThanOrEqual(20);
       for (const r of recs) expect(known.has(r.hangul.slice(1))).toBe(true);
     }
   });
@@ -276,5 +267,42 @@ describe('둘째 글자 율·열', () => {
     expect(mid).toContain('律');
     const r = recommendNames({ ...base, prefs: { ...DEFAULT_PREFERENCES, fixed: { position: 1, hangul: '율', hanja: '律' } } });
     expect(r.length).toBeGreaterThan(0);
+  });
+});
+
+describe('오류 시뮬레이션: 여러 사주·성씨·성별·느낌·기준', () => {
+  const sajus = Array.from({ length: 12 }, (_, k) =>
+    analyzePillars({ year: { stem: k % 10, branch: (k * 5) % 12 }, month: { stem: (k * 3) % 10, branch: (k * 7 + 2) % 12 }, day: { stem: (k * 7) % 10, branch: (k * 11) % 12 }, hour: { stem: (k * 9) % 10, branch: (k + 4) % 12 } } as never),
+  );
+  const APP = { ...DEFAULT_SCHOOL_OPTIONS, yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app' } as const;
+  const FEM = /[아나미라리린혜슬별설경연]$/;
+  const MAS = /[준혁훈호철석범웅환건강찬]$/;
+  const mainM = new Set([...COMMON_NAMES.male, ...POPULAR_NAMES.male]);
+  const mainF = new Set([...COMMON_NAMES.female, ...POPULAR_NAMES.female]);
+  it('점수 높은 순, 성별에 맞는 이름, 비지 않음 (12사주 × 3성씨 × 2성별 × 3느낌 × 2기준)', () => {
+    for (const sj of sajus) for (const surname of [[{ hangul: '김', hanja: '金' }], [{ hangul: '박', hanja: '朴' }], [{ hangul: '정', hanja: '鄭' }]]) for (const gender of ['female', 'male'] as const) for (const style of ['popular', 'balanced', 'unique'] as const) for (const options of [DEFAULT_SCHOOL_OPTIONS, APP]) {
+      const r = recommendNames({ surname, gender, saju: sj, prefs: { ...DEFAULT_PREFERENCES, style }, options: options as never, limit: 40 });
+      expect(r.length).toBeGreaterThan(0);
+      const totals = r.map((x) => x.report.score.total);
+      expect([...totals].sort((x, y) => y - x)).toEqual(totals);
+      for (const x of r) {
+        const g = x.hangul.slice(1);
+        if (gender === 'male') expect(FEM.test(g) && !mainM.has(g), `남자아이에게 ${g}`).toBe(false);
+        else expect(MAS.test(g) && !mainF.has(g), `여자아이에게 ${g}`).toBe(false);
+      }
+    }
+  });
+  it('정통 성명학과 일반 작명앱 기준의 상위 20개 이름이 거의 겹치지 않는다', () => {
+    for (const sj of sajus.slice(0, 6)) for (const gender of ['female', 'male'] as const) {
+      const a = new Set(recommendNames({ ...base, gender, saju: sj, limit: 40 }).slice(0, 20).map((x) => x.hangul));
+      const b = recommendNames({ ...base, gender, saju: sj, options: APP as never, limit: 40 }).slice(0, 20).map((x) => x.hangul);
+      expect(b.filter((x) => a.has(x)).length).toBeLessThanOrEqual(4);
+    }
+  });
+  it('외자는 실제로 외자 이름에 쓰는 글자만', () => {
+    for (const sj of sajus.slice(0, 6)) for (const gender of ['female', 'male'] as const) {
+      const allowed = new Set(SYLLABLES.single[gender].map(([s]) => s));
+      for (const x of recommendNames({ ...base, gender, saju: sj, prefs: { ...DEFAULT_PREFERENCES, length: 1 }, limit: 30 })) expect(allowed.has(x.hangul.slice(1)), x.hangul).toBe(true);
+    }
   });
 });
