@@ -169,6 +169,9 @@ export function analyzeSiblings(
 }
 
 /** 다둥이 이름 세트 추천 (설계서 11절). 세트점수 = 0.6×개인 평균 + 0.4×쌍 평균 */
+/** 다둥이는 열 명까지 */
+export const MAX_SIBLINGS = 10;
+
 export function recommendSiblingSets(
   surname: NameChar[],
   children: ChildInput[],
@@ -177,8 +180,8 @@ export function recommendSiblingSets(
   schoolOpts: SchoolOptions,
   limit = 10,
 ): SiblingSet[] {
-  if (children.length < 2 || children.length > 4) throw new RangeError('SIBLINGS_2_TO_4');
-  const per = children.length <= 3 ? 40 : 25;
+  if (children.length < 2 || children.length > MAX_SIBLINGS) throw new RangeError('SIBLINGS_2_TO_10');
+  const per = children.length <= 3 ? 40 : children.length === 4 ? 25 : 16;
   const sajus = children.map((c) => (c.birth ? computeSaju(c.birth, sajuOpts) : null));
   const surHangul = surname.map((c) => c.hangul).join('');
   const surHanja = surname.map((c) => c.hanja ?? '').join('');
@@ -234,7 +237,33 @@ export function recommendSiblingSets(
       walk(k + 1);
     }
   };
-  walk(0);
+  if (children.length <= 4) walk(0);
+  else {
+    // 다섯 명 이상은 모든 조합을 볼 수 없어(16^5 이상) 빔 탐색: 아이를 한 명씩 더하며 점수가 좋은 부분 세트 상위 BEAM개만 남긴다
+    const BEAM = 160;
+    type Part = { idx: number[]; indiv: number; pairSum: number; pairN: number; names: Set<string> };
+    let beam: Part[] = [{ idx: [], indiv: 0, pairSum: 0, pairN: 0, names: new Set() }];
+    const partScore = (q: Part) => 0.6 * (q.indiv / q.idx.length) + 0.4 * (q.pairN ? q.pairSum / q.pairN : 0);
+    for (let k = 0; k < children.length; k++) {
+      const list = candidates[k] as Recommendation[];
+      const next: Part[] = [];
+      for (const q of beam) {
+        for (let c = 0; c < list.length; c++) {
+          const n = list[c] as Recommendation;
+          if (q.names.has(n.hangul)) continue;
+          let add = 0;
+          for (let i = 0; i < q.idx.length; i++) add += pairOf(i, q.idx[i] as number, k, c).score;
+          next.push({ idx: [...q.idx, c], indiv: q.indiv + n.report.score.total, pairSum: q.pairSum + add, pairN: q.pairN + q.idx.length, names: new Set([...q.names, n.hangul]) });
+        }
+      }
+      next.sort((a, b) => partScore(b) - partScore(a) || a.idx.join(',').localeCompare(b.idx.join(',')));
+      beam = next.slice(0, BEAM);
+    }
+    for (const q of beam) {
+      const names = q.idx.map((ci, i) => (candidates[i] as Recommendation[])[ci] as Recommendation);
+      results.push({ idx: q.idx, score: round1(partScore(q)), key: names.map((n) => n.hanja).join('|'), set: names.map((n) => n.hangul).sort().join('|') });
+    }
+  }
   results.sort((a, b) => b.score - a.score || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
   // 같은 이름이 여러 세트를 독차지하지 않도록, 한 이름은 최대 3세트까지

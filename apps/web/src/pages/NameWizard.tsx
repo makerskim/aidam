@@ -7,7 +7,7 @@ import { useGate } from '../lib/gate';
 import { useLibrary } from '../lib/library';
 import { useSettings } from '../lib/settings';
 import { useStoredState } from '../lib/storage';
-import { DEFAULT_PREFS, fromSearch, KID_LABELS, STATE_VERSION, toQuery, type AnalyzeState, type NameState, type SurnameSel } from '../lib/state';
+import { DEFAULT_PREFS, fromSearch, KID_LABELS, MAX_KIDS, STATE_VERSION, toQuery, type AnalyzeState, type NameState, type SurnameSel } from '../lib/state';
 
 type StepKey = 'surname' | 'purpose' | 'given' | 'count' | 'gender' | 'birth' | 'prefs';
 type Purpose = 'new' | 'check';
@@ -70,7 +70,7 @@ function fromState(s: NameState): Draft {
     count: kids.length > 1 ? kids.length : 1,
     kidMode: s.kidMode ?? 'set',
     gender: s.gender,
-    kids: [...kids, kid(), kid(), kid(), kid()].slice(0, 4),
+    kids: [...kids, ...Array.from({ length: MAX_KIDS }, kid)].slice(0, MAX_KIDS),
     birth: draftFromBirth(s.birth),
     prefs: s.prefs,
     fixedHangul: s.prefs.fixed?.hangul ?? '',
@@ -133,7 +133,7 @@ export function NameWizard() {
     if (nextStep) go(nextStep, patch);
   };
   const multi = draft.purpose === 'new' && draft.count > 1;
-  const allKids = [...draft.kids, kid(), kid(), kid(), kid()].slice(0, 4);
+  const allKids = [...draft.kids, ...Array.from({ length: MAX_KIDS }, kid)].slice(0, MAX_KIDS);
   const kids = allKids.slice(0, draft.count);
   const setKid = (i: number, patch: Partial<Kid>) => setDraft({ kids: allKids.map((k, j) => (j === i ? { ...k, ...patch } : k)) });
   const birthResult = multi ? birthFromDraft({ ...draft.birth, timeKnown: false }) : birthFromDraft(draft.birth);
@@ -281,14 +281,31 @@ export function NameWizard() {
                   [1, '한 명'],
                   [2, '쌍둥이'],
                   [3, '세쌍둥이'],
-                  [4, '네쌍둥이'],
                 ] as const
               ).map(([n, label]) => (
                 <button key={n} type="button" className="tile" aria-pressed={draft.count === n} onClick={() => setDraft({ count: n })}>
                   {label}
                 </button>
               ))}
+              <button type="button" className="tile" aria-pressed={draft.count >= 4} onClick={() => setDraft({ count: Math.max(4, draft.count) })}>
+                네 명 이상
+              </button>
             </div>
+            {draft.count >= 4 ? (
+              <Field label="아기는 모두 몇 명인가요?">
+                <div className="stepper" role="group" aria-label="아기 수 정하기">
+                  <button type="button" className="icon-btn" aria-label="한 명 줄이기" disabled={draft.count <= 4} onClick={() => setDraft({ count: draft.count - 1 })}>
+                    −
+                  </button>
+                  <b className="num" aria-live="polite">
+                    {draft.count}명
+                  </b>
+                  <button type="button" className="icon-btn" aria-label="한 명 늘리기" disabled={draft.count >= MAX_KIDS} onClick={() => setDraft({ count: draft.count + 1 })}>
+                    +
+                  </button>
+                </div>
+              </Field>
+            ) : null}
             {draft.count > 1 ? (
               <Field label="이름은 어떻게 지을까요?">
                 <Segmented

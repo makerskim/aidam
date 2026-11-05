@@ -303,7 +303,7 @@ export function Results() {
   };
 
   const count = state.kids?.length ?? 1;
-  const title = count === 2 ? '쌍둥이 이름 추천' : count === 3 ? '세쌍둥이 이름 추천' : count === 4 ? '네쌍둥이 이름 추천' : '아기 이름 추천';
+  const title = count === 2 ? '쌍둥이 이름 추천' : count === 3 ? '세쌍둥이 이름 추천' : count >= 4 ? `다둥이 ${count}명 이름 추천` : '아기 이름 추천';
   const GENDER = { female: '여자아이', male: '남자아이', unknown: '성별 모름' } as const;
   const b = state.birth;
   const metaLine = [

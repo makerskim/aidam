@@ -34,7 +34,9 @@ export interface NameState extends Common {
   kidMode?: 'set' | 'each';
 }
 
-export const KID_LABELS = ['첫째', '둘째', '셋째', '넷째'];
+/** 다둥이는 열 명까지 */
+export const MAX_KIDS = 10;
+export const KID_LABELS = ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째', '아홉째', '열째'];
 
 /** 다둥이 각자의 출생 정보 */
 export function kidBirth(state: NameState, i: number): BirthInput | null {

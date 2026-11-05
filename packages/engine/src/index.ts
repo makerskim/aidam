@@ -29,7 +29,7 @@ export {
   type NameChar, type NameInput, type NameReport, type SchoolOptions, type Reason, type ReasonArea, type Gender,
   type FrameResult, type ResourceChar,
 } from './name/analyze';
-export { MAX as SCORE_MAX, gradeOf, type ScoreBreakdown, type Grade } from './score/score';
+export { MAX as SCORE_MAX, PROFILE_MAX, gradeOf, type ScoreBreakdown, type Grade, type AreaMax } from './score/score';
 export {
   recommendNames, suggestBetterHanja, DEFAULT_PREFERENCES, type Preferences, type Recommendation,
 } from './recommend/recommend';

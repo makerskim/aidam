@@ -1,5 +1,5 @@
 // 아이담 오프라인 캐시: 같은 출처의 GET 요청만 캐시한다. 외부 요청은 하지 않는다.
-const CACHE = 'aidam-v1';
+const CACHE = 'aidam-v2';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil(

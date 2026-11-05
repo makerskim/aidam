@@ -309,8 +309,11 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
         const resource = resourcePointsFor(entries, saju);
         const syy = strokeYinYang([...(surEntries as HanjaEntry[]).map((h) => h.strokes), ...strokes]).balanced ? 6 : 0;
         const bulyong = entries.some((h) => h.bulyong) ? 0 : 3;
-        // 실용 점수의 이름 느낌 몫(3점)은 정식 분석과 똑같이 늘 만점으로 둔다
-        const total = resource + suri.points + hc.soundPts + syy + hc.vowelPts + 5 + bulyong + hc.practicalSound + 3;
+        // 실용 점수의 이름 느낌 몫(3점)은 정식 분석과 똑같이 늘 만점으로 둔다. 배점은 정식 분석과 같게
+        const total =
+          options.scoring === 'app'
+            ? (resource * 25) / 30 + suri.points + hc.soundPts + (syy + hc.vowelPts) * 1.5
+            : resource + suri.points + hc.soundPts + syy + hc.vowelPts + 5 + bulyong + hc.practicalSound + 3;
         best.push({ hangul: hc.hangul, hanja: entries.map((h) => h.ch).join(''), entries, total, strictOk: suri.noBad && !hc.clash });
       }
       best.sort((a, b) => b.total - a.total || cmpCodePoints(a.hanja, b.hanja));

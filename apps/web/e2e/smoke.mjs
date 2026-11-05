@@ -161,7 +161,10 @@ async function twins(mode) {
   await page.click('button:has-text("다음")');
   await page.click('button.tile:has-text("새 이름 추천받기")');
   await page.click('.wizard-actions button:has-text("다음")');
-  assert.ok(await page.locator('button.tile:has-text("네쌍둥이")').count(), '네쌍둥이 선택지 없음');
+  // 네 명 이상은 직접 정한다(10명까지)
+  await page.click('button.tile:has-text("네 명 이상")');
+  await page.click('button[aria-label="한 명 늘리기"]');
+  assert.equal((await page.locator('.stepper b').textContent())?.trim(), '5명', '아기 수 늘리기');
   await page.click('button.tile:text-is("쌍둥이")');
   await page.click(`button:has-text("${mode}")`);
   await page.click('button:has-text("다음")');
@@ -192,11 +195,13 @@ assert.ok(await page.locator('.pick-card .harmony-score').count(), '다둥이 �
 console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 
 // 8a) 계산 기준 바꾸기: 정통 성명학 → 일반 작명앱 (다시 계산하고 기준이 바뀐다)
+const classicCards = (await page.locator('.name-card').allInnerTexts()).slice(0, 10).join('|');
 await page.click('.basis-head');
-assert.equal(await page.locator('.basis-row').count(), 4, '계산 기준 항목 4개(용신·발음오행·수리오행·한자오행)');
+assert.equal(await page.locator('.basis-row').count(), 4, '계산 기준 항목 4개(용신·발음오행·배점·한자오행)');
 await page.click('.basis-body .choice:has-text("일반 작명앱")');
 await page.waitForSelector('.basis-head:has-text("일반 작명앱")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
+await page.waitForFunction((prev) => [...document.querySelectorAll('.name-card')].slice(0, 10).map((e) => e.innerText).join('|') !== prev, classicCards, { timeout: 40000 }).catch(() => assert.fail('정통·일반 작명앱 기준 결과가 같음'));
 if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
 await page.click('.basis-row:has-text("발음오행") .seg button:has-text("해례본")');
 await page.waitForSelector('.basis-head:has-text("부족한 오행 · 해례본")', { timeout: 10000 });

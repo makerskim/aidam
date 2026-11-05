@@ -2,10 +2,11 @@ import type { SchoolOptions } from '@aidam/engine';
 
 /**
  * 계산 기준. 작명 이론은 학파·서비스마다 달라, 보는 사람이 항목마다 두 가지 중에서 고른다.
- * - 정통 성명학(아이담 기본): 억부·조후 용신, 해례본, 수리오행 가볍게, 부수 기준 한자오행
- * - 일반 작명앱: 부족한 오행 용신, 운해본, 수리오행 중시, 부수 기준 한자오행
+ * - 정통 성명학(아이담 기본): 억부·조후 용신, 해례본, 정통 배점, 부수 기준 한자오행
+ * - 일반 작명앱: 부족한 오행 용신, 운해본, 일반 앱 배점(수리오행 15점), 부수 기준 한자오행
+ * 알고리즘 전체는 docs/basis-algorithms.md
  */
-export type BasisKey = 'yongsinMethod' | 'soundSchool' | 'suriElement' | 'hanjaElement';
+export type BasisKey = 'yongsinMethod' | 'soundSchool' | 'scoring' | 'hanjaElement';
 
 export interface BasisItem {
   key: BasisKey;
@@ -34,12 +35,12 @@ export const BASIS_ITEMS: BasisItem[] = [
     ],
   },
   {
-    key: 'suriElement',
-    label: '수리오행',
-    desc: '4격 획수로 정한 오행끼리 서로 살려 주는지예요. 수리 25점 중 3점으로 가볍게 볼지, 8점으로 크게 볼지 골라요.',
+    key: 'scoring',
+    label: '배점 (수리오행 포함)',
+    desc: '정통: 한자오행 30 · 수리 25(수리오행 3) · 발음 20 · 음양 10 · 뜻 15. 일반 앱: 한자오행 25 · 수리 40(수리오행 15) · 발음 20 · 음양 15.',
     options: [
-      { value: 'light', label: '가볍게' },
-      { value: 'strong', label: '중요하게' },
+      { value: 'classic', label: '정통 배점' },
+      { value: 'app', label: '일반 앱 배점' },
     ],
   },
   {
@@ -54,8 +55,8 @@ export const BASIS_ITEMS: BasisItem[] = [
 ];
 
 export const PRESETS = {
-  classic: { yongsinMethod: 'eokbu', soundSchool: 'haerye', suriElement: 'light', hanjaElement: 'radical' },
-  app: { yongsinMethod: 'lacking', soundSchool: 'unhae', suriElement: 'strong', hanjaElement: 'radical' },
+  classic: { yongsinMethod: 'eokbu', soundSchool: 'haerye', scoring: 'classic', hanjaElement: 'radical' },
+  app: { yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app', hanjaElement: 'radical' },
 } as const satisfies Record<string, Record<BasisKey, string>>;
 
 export const PRESET_LABEL = { classic: '정통 성명학', app: '일반 작명앱' } as const;
@@ -83,6 +84,6 @@ export function basisSummary(school: SchoolOptions): string {
   if (p) return PRESET_LABEL[p];
   return BASIS_ITEMS.map((it) => {
     const v = it.options.find((o) => o.value === basisValue(school, it.key))?.label ?? '';
-    return it.key === 'suriElement' ? `수리오행 ${v}` : v;
+    return v;
   }).join(' · ');
 }

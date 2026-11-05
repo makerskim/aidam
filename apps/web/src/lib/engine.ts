@@ -60,7 +60,7 @@ const ERRORS: Record<string, string> = {
   INVALID_PLACE: '출생지를 다시 골라 주세요.',
   INVALID_NAME: '이름은 한글 1~4글자, 성은 1~2글자로 입력해 주세요.',
   UNKNOWN_SURNAME_HANJA: '성씨 한자를 목록에서 골라 주세요.',
-  SIBLINGS_2_TO_4: '아이는 2명에서 4명까지 함께 지을 수 있어요.',
+  SIBLINGS_2_TO_10: '아이는 2명에서 10명까지 함께 지을 수 있어요.',
 };
 
 export function errorMessage(e: unknown): string {

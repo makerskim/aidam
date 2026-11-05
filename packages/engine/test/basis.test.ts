@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SAJU_OPTIONS } from '../src/saju/pillars';
 import { analyzePillars, lackingMethod } from '../src/saju/analysis';
 import { BRANCHES, STEMS, type Pillar } from '../src/core/ganji';
 import { analyzeName, DEFAULT_SCHOOL_OPTIONS, type SchoolOptions } from '../src/name/analyze';
@@ -58,5 +59,42 @@ describe('두 기준으로 같은 이름을 보면', () => {
     expect(a.score.total).toBeGreaterThan(0);
     expect(b.score.total).toBeGreaterThan(0);
     expect(b.options.soundSchool).toBe('unhae');
+  });
+});
+
+describe('배점: 정통 성명학 / 일반 작명앱', () => {
+  const input = { surname: [{ hangul: '김', hanja: '金' }], given: [{ hangul: '아', hanja: '亞' }, { hangul: '경', hanja: '璟' }], gender: 'female' as const };
+  it('두 배점 모두 만점의 합은 100이다', async () => {
+    const { PROFILE_MAX } = await import('../src/score/score');
+    for (const m of Object.values(PROFILE_MAX)) expect(m.resource + m.suri + m.sound + m.yinyang + m.practical).toBe(100);
+  });
+  it('일반 앱 배점은 영역 만점이 다르고 점수도 정통과 다르게 나온다', () => {
+    const a = analyzeName(input, saju, DEFAULT_SCHOOL_OPTIONS);
+    const b = analyzeName(input, saju, { ...APP, hanjaElement: 'radical', scoring: 'app' });
+    expect(a.score.max.resource).toBe(30);
+    expect(b.score.max.suri).toBe(40);
+    expect(b.score.max.practical).toBe(0);
+    expect(b.score.suri).toBeLessThanOrEqual(40);
+    expect(b.score.total).not.toBe(a.score.total);
+  });
+  it('일반 앱 기준 추천 목록은 정통 기준과 다르다', () => {
+    const args = { surname: [{ hangul: '김', hanja: '金' }], gender: 'female' as const, saju, prefs: DEFAULT_PREFERENCES, limit: 30 };
+    const a = recommendNames({ ...args, options: DEFAULT_SCHOOL_OPTIONS }).map((r) => r.hanja);
+    const b = recommendNames({ ...args, options: { ...APP, hanjaElement: 'radical', scoring: 'app' } }).map((r) => r.hanja);
+    expect(b.slice(0, 10)).not.toEqual(a.slice(0, 10));
+  });
+});
+
+describe('다둥이 다섯 명 이상', () => {
+  it('다섯 명도 서로 다른 이름의 세트를 낸다', async () => {
+    const { recommendSiblingSets } = await import('../src/siblings/siblings');
+    const birth = { calendar: 'solar' as const, year: 2026, month: 3, day: 14, time: { hour: 9, minute: 30 }, placeId: 'seoul' };
+    const kids = Array.from({ length: 5 }, (_, i) => ({ label: `${i + 1}`, gender: (i % 2 ? 'male' : 'female') as 'male' | 'female', birth }));
+    const sets = recommendSiblingSets([{ hangul: '김', hanja: '金' }], kids as never, DEFAULT_PREFERENCES, DEFAULT_SAJU_OPTIONS, DEFAULT_SCHOOL_OPTIONS, 5);
+    expect(sets.length).toBeGreaterThan(0);
+    for (const st of sets) {
+      expect(st.names).toHaveLength(5);
+      expect(new Set(st.names.map((n) => n.hangul)).size).toBe(5);
+    }
   });
 });

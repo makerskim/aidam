@@ -98,6 +98,7 @@ export function insights(report: NameReport, saju: SajuAnalysis | null): Insight
 
 /** 점수표: 항목·점수·한 줄 평가 */
 export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreRow[] {
+  const M = report.score.max ?? { resource: 30, suri: 25, sound: 20, yinyang: 10, practical: 15 };
   const s = report.score;
   const hasHanja = report.frames !== null;
   const bad = report.frameResults.filter((f) => f.info.luck === 'bad').length;
@@ -110,7 +111,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
     {
       key: 'resource',
       label: '사주 보완(자원오행)',
-      max: 30,
+      max: M.resource,
       score: report.resource.length === report.input.given.length && report.resource.length > 0 ? s.resource : null,
       verdict: !saju ? '사주 없이 계산' : yong.length ? `${yong.map((r) => ELEMENT_HANJA[r.element]).join('·')} 기운 보완` : against.length ? '사주와 맞지 않음' : '보완 약함',
       tone: !saju ? 'neutral' : yong.length && !against.length ? 'good' : against.length ? 'bad' : 'neutral',
@@ -118,7 +119,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
     {
       key: 'suri',
       label: '획수(81수리)',
-      max: 25,
+      max: M.suri,
       score: hasHanja ? s.suri : null,
       verdict: !hasHanja ? '한자를 고르면 계산' : bad ? `나쁜 수 ${bad}개` : '4격 모두 좋음',
       tone: !hasHanja ? 'neutral' : bad ? 'bad' : 'good',
@@ -126,7 +127,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
     {
       key: 'sound',
       label: '소리오행',
-      max: 20,
+      max: M.sound,
       score: s.sound,
       verdict: clash ? '상극 있음' : flow.pairs.every((p) => p.kind === 'forward' || p.kind === 'backward') ? '상생' : '무난',
       tone: clash ? 'bad' : 'good',
@@ -134,7 +135,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
     {
       key: 'yinyang',
       label: '음양 조화',
-      max: 10,
+      max: M.yinyang,
       score: s.yinyang,
       verdict: report.strokeYinYang?.balanced === false || report.vowel.level === 'unbalanced' ? '한쪽으로 치우침' : '고름',
       tone: report.strokeYinYang?.balanced === false || report.vowel.level === 'unbalanced' ? 'bad' : 'good',
@@ -142,7 +143,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
     {
       key: 'practical',
       label: '뜻·발음',
-      max: 15,
+      max: M.practical,
       score: s.practical,
       verdict: negative ? '피하는 뜻 있음' : report.pronunciation.join('') !== report.fullHangul ? '발음 변화 있음' : '좋음',
       tone: negative ? 'bad' : report.pronunciation.join('') !== report.fullHangul ? 'neutral' : 'good',
@@ -524,6 +525,8 @@ const VERDICT_TEXT: Record<Verdict, string> = { good: '좋아요', ok: '보통�
 /** 다섯 기준을 일반인이 이해하는 말로 풀이한다 */
 export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Criterion[] {
   const s = report.score;
+  // 영역별 만점은 고른 배점(정통·일반 앱)을 따른다
+  const M = s.max ?? { resource: 30, suri: 25, sound: 20, yinyang: 10, practical: 15 };
   const given = report.input.given;
   const out: Criterion[] = [];
 
@@ -553,7 +556,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       if (missing.length) pros.push(`사주 여덟 글자에 하나도 없는 ${missing.map(plain).join('·')} 기운까지 채워 줘요.`);
       if (!report.resource.some((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui')) cons.push(`이 아이에게 필요한 ${need} 기운을 채우는 한자가 없어요.`);
     }
-    const ratio = s.partial && report.resource.length === 0 ? null : s.resource / 30;
+    const ratio = s.partial && report.resource.length === 0 ? null : s.resource / (M.resource || 1);
     const ROLE_KO = { yong: '용신', hui: '희신', han: '한신', gu: '구신', gi: '기신' } as const;
     const table: Criterion['table'] = a
       ? [
@@ -577,7 +580,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       pros,
       cons,
       score: report.resource.length ? s.resource : null,
-      max: 30,
+      max: M.resource,
       summary: '',
     });
   }
@@ -611,12 +614,12 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       key: 'sound',
       title: '부를 때 소리가 어울리나요',
       why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. 학설이 둘(해례본·운해본)이라 둘 다 보여 드려요. 점수는 ${school === 'unhae' ? '운해본' : '해례본'} 기준이에요(계산 기준에서 바꿀 수 있어요).${known.length ? '' : ''}`,
-      verdict: verdictOf(s.sound / 20),
-      verdictText: VERDICT_TEXT[verdictOf(s.sound / 20)],
+      verdict: verdictOf(s.sound / (M.sound || 1)),
+      verdictText: VERDICT_TEXT[verdictOf(s.sound / (M.sound || 1))],
       pros,
       cons,
       score: s.sound,
-      max: 20,
+      max: M.sound,
       summary: '',
     });
   }
@@ -636,13 +639,13 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
     out.push({
       key: 'suri',
       title: '획수로 본 평생 운',
-      why: `성과 이름 한자의 획수를 더해 초년·청년·장년·말년 네 시기의 운을 봐요(81수리). 네 시기 수의 오행끼리 살려 주는지(수리오행)도 ${report.options.suriElement === 'strong' ? '25점 중 8점으로 중요하게' : '25점 중 3점으로 가볍게'}봐요.`,
-      verdict: report.frames ? verdictOf(s.suri / 25) : 'ok',
-      verdictText: report.frames ? VERDICT_TEXT[verdictOf(s.suri / 25)] : '한자 필요',
+      why: `성과 이름 한자의 획수를 더해 초년·청년·장년·말년 네 시기의 운을 봐요(81수리). 네 시기 수의 오행끼리 살려 주는지(수리오행)도 ${report.options.scoring === 'app' ? '40점 중 15점으로 중요하게' : report.options.suriElement === 'strong' ? '25점 중 8점으로 중요하게' : '25점 중 3점으로 가볍게'} 봐요.`,
+      verdict: report.frames ? verdictOf(s.suri / (M.suri || 1)) : 'ok',
+      verdictText: report.frames ? VERDICT_TEXT[verdictOf(s.suri / (M.suri || 1))] : '한자 필요',
       pros,
       cons,
       score: report.frames ? s.suri : null,
-      max: 25,
+      max: M.suri,
       summary: '',
     });
   }
@@ -663,12 +666,12 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       key: 'yinyang',
       title: '음양의 균형',
       why: '홀수·짝수 획, 밝은·어두운 모음이 고루 섞여야 이름의 기운이 한쪽으로 기울지 않는다고 봐요.',
-      verdict: verdictOf(s.yinyang / 10),
-      verdictText: VERDICT_TEXT[verdictOf(s.yinyang / 10)],
+      verdict: verdictOf(s.yinyang / (M.yinyang || 1)),
+      verdictText: VERDICT_TEXT[verdictOf(s.yinyang / (M.yinyang || 1))],
       pros,
       cons,
       score: s.yinyang,
-      max: 10,
+      max: M.yinyang,
       summary: '',
     });
   }
@@ -693,12 +696,13 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       key: 'meaning',
       title: '뜻과 발음',
       why: '한자의 뜻이 좋은지, 부르기 쉽고 놀림받을 소리가 없는지 봐요.',
-      verdict: verdictOf(s.practical / 15),
-      verdictText: VERDICT_TEXT[verdictOf(s.practical / 15)],
+      // 일반 앱 배점은 뜻·발음을 점수에 넣지 않고 거르기만 한다
+      verdict: M.practical ? verdictOf(s.practical / M.practical) : 'ok',
+      verdictText: M.practical ? VERDICT_TEXT[verdictOf(s.practical / M.practical)] : '점수 미반영',
       pros,
       cons,
-      score: s.practical,
-      max: 15,
+      score: M.practical ? s.practical : null,
+      max: M.practical,
       summary: '',
     });
   }

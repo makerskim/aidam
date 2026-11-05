@@ -466,13 +466,15 @@ img {
 }
 .seg {
   display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
   background: var(--bg-2);
   border-radius: 14px;
   padding: 4px;
   gap: 4px;
 }
 .seg button {
-  flex: 1;
+  flex: 1 0 auto;
   white-space: nowrap;
   padding: 0 14px;
   min-height: 46px;
@@ -3389,4 +3391,31 @@ img {
 .bc-item.on {
   border-color: var(--ink);
   box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* 아기 수 정하기 */
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+}
+.stepper .icon-btn {
+  width: 52px;
+  height: 52px;
+  font-size: 26px;
+  font-weight: 700;
+  border-radius: 12px;
+  background: var(--bg-2);
+}
+.stepper .icon-btn:disabled {
+  opacity: 0.35;
+}
+.stepper b {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ink);
 }

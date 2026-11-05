@@ -3,7 +3,7 @@ import { isHangulSyllable } from '../hangul/jamo';
 import { applyDueum } from '../hangul/dueum';
 import { pronounce } from '../hangul/pronounce';
 import { ROLE_KO, sajuForMethod, type SajuAnalysis, type YongsinMethod } from '../saju/analysis';
-import { combineScore, type ScoreBreakdown } from '../score/score';
+import { combineScore, PROFILE_MAX, type ScoreBreakdown } from '../score/score';
 import { analysisCode } from '../share/hash';
 import { DATA_VERSION, ENGINE_VERSION } from '../version';
 import { entryForBasis, getHanja, isNameHanja, type HanjaEntry } from './hanjaDb';
@@ -43,6 +43,8 @@ export interface SchoolOptions {
   suriElement?: 'light' | 'strong';
   /** 한자(자원)오행: 부수 우선(기본) / 뜻 우선 */
   hanjaElement?: 'radical' | 'meaning';
+  /** 채점 방식(배점): 정통 성명학(기본) / 일반 작명앱. 영역별 만점은 PROFILE_MAX */
+  scoring?: 'classic' | 'app';
 }
 
 export const DEFAULT_SCHOOL_OPTIONS: SchoolOptions = {
@@ -141,9 +143,10 @@ export function suriPointsFor(
   const strongHits: (keyof FourFrames)[] = [];
   let points = 0;
   let noBad = true;
-  // 수리오행 비중: 기본 3점(길흉 22점), 수리오행 중시 8점(길흉 17점)
-  const flowWeight = options.suriElement === 'strong' ? 8 : 3;
-  const luckScale = (25 - flowWeight) / 22;
+  // 수리오행 비중. 정통: 기본 3점(길흉 22점), 수리오행 중시 8점(길흉 17점) / 일반 앱 배점: 길흉 25점 + 수리오행 15점
+  const app = options.scoring === 'app';
+  const flowWeight = app ? 15 : options.suriElement === 'strong' ? 8 : 3;
+  const luckScale = app ? 25 / 22 : (25 - flowWeight) / 22;
   for (const key of ['won', 'hyeong', 'i', 'jeong'] as const) {
     const n = frames[key];
     const info = suri81(n);
@@ -339,14 +342,19 @@ export function analyzeName(
   }
 
   const passesStrict = strictFrames && !flow.pairs.some((p) => p.kind === 'clash') && !negative && !tease;
+  // 배점: 정통 성명학(기본) / 일반 작명앱 — 영역 점수를 그 방식의 만점에 맞춰 늘이거나 줄인다
+  const areaMax = PROFILE_MAX[options.scoring === 'app' ? 'app' : 'classic'];
+  const yyScale = areaMax.yinyang / 10;
   const score = combineScore({
-    resource: resourcePts,
+    resource: resourcePts === null ? null : (resourcePts * areaMax.resource) / 30,
     suri: suriPts,
     sound: flow.score * 20,
-    strokeYinYang: syy ? (syy.balanced ? 6 : 0) : null,
-    vowelYinYang: vowel.score * 4,
-    practical: { points: pracPts, max: pracMax },
+    strokeYinYang: syy ? (syy.balanced ? 6 : 0) * yyScale : null,
+    vowelYinYang: vowel.score * 4 * yyScale,
+    practical: areaMax.practical === 0 ? { points: 0, max: 0 } : { points: pracPts, max: pracMax },
     passesStrict,
+    areaMax,
+    yinyangMaxWithoutStrokes: 4 * yyScale,
   });
   if (score.partial) warnings.push('한자를 고르지 않은 글자가 있어 자원오행·수리는 빼고 계산했어요.');
 
