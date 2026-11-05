@@ -117,7 +117,7 @@ export const api = {
     const report = analyzeName(input, saju?.primary ?? null, state.school);
     const allHanja = state.given.every((g) => g.hanja);
     const better = allHanja ? suggestBetterHanja(input, saju?.primary ?? null, state.school, 20) : [];
-    // 같은 이름을 두 기준(정통 성명학·일반 작명앱)으로 함께 채점해 비교해 보여 준다
+    // 같은 이름을 두 기준(정통 성명학·실용 작명법)으로 함께 채점해 비교해 보여 준다
     const base = state.birth ? computeSaju(state.birth, state.sajuOpts).primary : null;
     const compare = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => {
       const r = analyzeName(input, base, { ...state.school, ...(PRESETS[k] as unknown as Partial<SchoolOptions>) });

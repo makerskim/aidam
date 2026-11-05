@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { SchoolOptions } from '@aidam/engine';
-import { BASIS_ITEMS, basisSummary, basisValue, PRESET_LABEL, PRESETS, presetOf, withPreset } from '../lib/basis';
+import { BASIS_ITEMS, basisSummary, basisValue, PRESET_DESC, PRESET_LABEL, PRESETS, presetOf, withPreset } from '../lib/basis';
 import { Icon, Segmented } from './ui';
 
-/** 계산 기준 고르기: 평소엔 한 줄, 누르면 묶음(정통·일반 앱)과 항목별 두 가지 선택 */
+/** 계산 기준 고르기: 평소엔 한 줄, 누르면 묶음(정통·실용)과 항목별 두 가지 선택 */
 export function BasisPicker({ school, onChange }: { school: SchoolOptions; onChange: (s: SchoolOptions) => void }) {
   const [open, setOpen] = useState(false);
   const preset = presetOf(school);
@@ -18,10 +18,11 @@ export function BasisPicker({ school, onChange }: { school: SchoolOptions; onCha
       </button>
       {open ? (
         <div className="basis-body">
-          <div className="chips">
+          <div className="basis-presets">
             {(Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => (
-              <button key={k} type="button" className="choice" aria-pressed={preset === k} onClick={() => onChange(withPreset(school, k))}>
-                {PRESET_LABEL[k]}
+              <button key={k} type="button" className="bp-item" aria-pressed={preset === k} onClick={() => onChange(withPreset(school, k))}>
+                <b>{PRESET_LABEL[k]}</b>
+                <span>{PRESET_DESC[k]}</span>
               </button>
             ))}
           </div>

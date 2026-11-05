@@ -3427,3 +3427,94 @@ img {
   white-space: nowrap;
   text-wrap: nowrap;
 }
+
+/* 두 줄 안내: 굵은 첫 줄 + 설명 한 줄 */
+.note-soft.two-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.note-soft.two-line b {
+  font-weight: 800;
+}
+.note-soft.two-line span {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.basis-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.bp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  text-align: left;
+  cursor: pointer;
+}
+.bp-item b {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.bp-item span {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.bp-item[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* 계산 과정 */
+.trace-head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.trace-head .small {
+  flex: 1;
+}
+.trace.open .trace-head svg {
+  transform: rotate(180deg);
+}
+.trace-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.trace-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 12px;
+  border-left: 3px solid var(--line);
+}
+.trace-steps b {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.trace-steps span {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}

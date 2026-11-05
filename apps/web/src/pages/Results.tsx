@@ -282,7 +282,7 @@ export function Results() {
         ) : null}
         <div className="list-anim stack" style={{ gap: 10 }}>
           {shown.map((r, i) => (
-            <Fragment key={r.hanja}>
+            <Fragment key={`${r.hangul}${r.hanja}`}>
               <NameCard rec={r} rank={ui.sort !== 'name' ? i + 1 : undefined} to={`/report?${reportQuery(state, r, kidIndex)}`} onOpen={remember} pick={pickFor(kidIndex, r)} />
             </Fragment>
           ))}
@@ -307,8 +307,9 @@ export function Results() {
   ].join(' · ');
   const sameNote =
     (data?.kind === 'each' || data?.kind === 'set') && data.sameSaju ? (
-      <p className="note-soft">
-        아이들의 사주가 같아 추천 목록도 같아요. {data.kind === 'each' ? '같은 목록에서 아이마다 이름을 하나씩 골라 보세요.' : '세트는 서로 다른 이름끼리 묶었어요.'}
+      <p className="note-soft two-line">
+        <b>아이들의 사주가 같아 추천 목록도 같아요.</b>
+        <span>{data.kind === 'each' ? '같은 목록에서 아이마다 이름을 하나씩 골라 주세요.' : '세트에는 서로 다른 이름끼리 묶었어요.'}</span>
       </p>
     ) : null;
 

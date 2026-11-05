@@ -3,8 +3,8 @@ import type { SchoolOptions } from '@aidam/engine';
 /**
  * 계산 기준. 작명 이론은 학파·서비스마다 달라, 보는 사람이 항목마다 두 가지 중에서 고른다.
  * - 정통 성명학(아이담 기본): 억부·조후 용신, 해례본, 정통 배점, 부수 기준 한자오행
- * - 일반 작명앱: 부족한 오행 용신, 운해본, 일반 앱 배점(수리오행 15점), 부수 기준 한자오행
- * 알고리즘 전체는 docs/basis-algorithms.md
+ * - 실용 작명법: 부족한 오행 용신, 운해본, 실용 배점(수리오행 15점), 부수 기준 한자오행 — 시중 작명 앱·작명소에서 널리 쓰는 방식
+ * 알고리즘 전체는 docs/naming-algorithm.md
  */
 export type BasisKey = 'yongsinMethod' | 'soundSchool' | 'scoring' | 'hanjaElement';
 
@@ -37,10 +37,10 @@ export const BASIS_ITEMS: BasisItem[] = [
   {
     key: 'scoring',
     label: '배점 (수리오행 포함)',
-    desc: '정통: 한자오행 30 · 수리 25(수리오행 3) · 발음 20 · 음양 10 · 뜻 15. 일반 앱: 한자오행 25 · 수리 40(수리오행 15) · 발음 20 · 음양 15.',
+    desc: '정통: 한자오행 30 · 수리 25(수리오행 3) · 발음 20 · 음양 10 · 뜻 15. 실용: 한자오행 25 · 수리 40(수리오행 15) · 발음 20 · 음양 15.',
     options: [
       { value: 'classic', label: '정통 배점' },
-      { value: 'app', label: '일반 앱 배점' },
+      { value: 'app', label: '실용 배점' },
     ],
   },
   {
@@ -59,7 +59,12 @@ export const PRESETS = {
   app: { yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app', hanjaElement: 'radical' },
 } as const satisfies Record<string, Record<BasisKey, string>>;
 
-export const PRESET_LABEL = { classic: '정통 성명학', app: '일반 작명앱' } as const;
+export const PRESET_LABEL = { classic: '정통 성명학', app: '실용 작명법' } as const;
+/** 묶음 한 줄 설명 */
+export const PRESET_DESC = {
+  classic: '억부·조후 용신 · 해례본 · 뜻까지 보는 배점',
+  app: '부족한 오행 용신 · 운해본 · 수리 중심 배점',
+} as const;
 
 export function basisValue(school: SchoolOptions, key: BasisKey): string {
   const defaults: Record<BasisKey, string> = PRESETS.classic;

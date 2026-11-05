@@ -203,7 +203,8 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
   const storiedAll = base.filter((h) => HANJA_STORY.has(h.ch));
   const list = storiedAll.length > 0 ? safeOf(storiedAll) : safeOf(base);
   const key = (h: HanjaEntry) =>
-    (FAMILIAR_HANJA.has(h.ch) ? 2 : 0) + (isPositiveMeaning(h.meaning) ? 1 : 0) + (h.edu ? 0.3 : 0) +
+    // 오행이 부수·뜻으로 분명한 한자를 먼저(획수 끝자리로 추정한 C는 뒤로)
+    (FAMILIAR_HANJA.has(h.ch) ? 2 : 0) + (isPositiveMeaning(h.meaning) ? 1 : 0) + (h.edu ? 0.3 : 0) - (h.elementConfidence === 'C' ? 1 : 0) +
     (saju ? saju.favor[h.element] * (h.elementConfidence === 'C' ? 0.5 : 1) : 0);
   return list
     .map((h) => ({ h, k: key(h) }))
@@ -398,9 +399,12 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
         cmpCodePoints(a.hangul, b.hangul) ||
         cmpCodePoints(a.hanja, b.hanja),
     );
+    // 한자가 같고 읽기만 다른 이름(率 솔/률 등)은 점수가 높은 하나만
+    const seenHanja = new Set<string>();
+    const uniq = out.filter((r) => (seenHanja.has(r.hanja) ? false : (seenHanja.add(r.hanja), true)));
     // 실제로 쓰는 이름이 충분하면 목록에 없는 조합(넓혀 찾은 이름)은 뺀다
-    const real = out.filter((r) => r.fit !== 2);
-    const shown = real.length >= Math.min(STYLE_ENOUGH, limit) ? real : out;
+    const real = uniq.filter((r) => r.fit !== 2);
+    const shown = real.length >= Math.min(STYLE_ENOUGH, limit) ? real : uniq;
     return { out: shown.slice(0, limit), size: kept.length };
   };
 

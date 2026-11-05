@@ -7,6 +7,7 @@ import { hanjaMeaning } from '../lib/format';
 import { PRESET_LABEL, presetOf, withPreset } from '../lib/basis';
 import { explainCriteria, nameHighlights, nameNarrative, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, tidy, type Criterion, type SajuRow } from '../lib/insights';
 import { Rich } from './rich';
+import { CalcTrace } from './trace';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { useCountUp } from '../lib/motion';
@@ -555,6 +556,8 @@ export function ReportView({
           </CriterionRow>
         ))}
       </section>
+
+      <CalcTrace report={report} saju={saju} />
 
       <details className="card-soft why-diff">
         <summary>다른 작명 서비스와 점수가 다른가요?</summary>

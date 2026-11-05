@@ -525,7 +525,7 @@ const VERDICT_TEXT: Record<Verdict, string> = { good: '좋아요', ok: '보통�
 /** 다섯 기준을 일반인이 이해하는 말로 풀이한다 */
 export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Criterion[] {
   const s = report.score;
-  // 영역별 만점은 고른 배점(정통·일반 앱)을 따른다
+  // 영역별 만점은 고른 배점(정통·실용)을 따른다
   const M = s.max ?? { resource: 30, suri: 25, sound: 20, yinyang: 10, practical: 15 };
   const given = report.input.given;
   const out: Criterion[] = [];
@@ -696,7 +696,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       key: 'meaning',
       title: '뜻과 발음',
       why: '한자의 뜻이 좋은지, 부르기 쉽고 놀림받을 소리가 없는지 봐요.',
-      // 일반 앱 배점은 뜻·발음을 점수에 넣지 않고 거르기만 한다
+      // 실용 배점은 뜻·발음을 점수에 넣지 않고 거르기만 한다
       verdict: M.practical ? verdictOf(s.practical / M.practical) : 'ok',
       verdictText: M.practical ? VERDICT_TEXT[verdictOf(s.practical / M.practical)] : '점수 미반영',
       pros,

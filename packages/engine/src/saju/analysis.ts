@@ -135,7 +135,7 @@ export function analyzePillars(p: Pillars): SajuAnalysis {
 
   let yong: Element;
   let hui: Element;
-  const g = (k: TenGodGroup) => `${GROUP_KO[k]}${el(groupElement[k])}`;
+  const g = (k: TenGodGroup) => `${GROUP_KO[k]} ${el(groupElement[k])}`;
   if (level === 'weak' || level === 'veryWeak') {
     const order: TenGodGroup[] = ['gwanseong', 'siksang', 'jaeseong'];
     const strongest = order.reduce((best, k) => (groups[k] > groups[best] ? k : best), order[0] as TenGodGroup);

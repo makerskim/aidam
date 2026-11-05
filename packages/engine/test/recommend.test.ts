@@ -213,7 +213,8 @@ describe('대표음 일치', () => {
         const h = getHanja(ch);
         const syl = [...r.hangul][i + 1] as string;
         const primary = h?.readings[0] ?? '';
-        expect(primary === syl || (i === 0 && applyDueum(primary) === syl), `${ch} ${h?.readings} ${syl}`).toBe(true);
+        const midLiquid = i > 0 && ({ 율: '률', 열: '렬' } as Record<string, string>)[syl] === primary;
+        expect(primary === syl || (i === 0 && applyDueum(primary) === syl) || midLiquid, `${ch} ${h?.readings} ${syl}`).toBe(true);
       });
     }
   });

@@ -109,6 +109,9 @@ assert.ok(await page.locator('.report .saju-panel').count(), '리포트에 만�
 assert.ok(await page.locator('.topbar >> text=한자 바꿔 보기').count(), '맨 위 한자 바꿔 보기 없음');
 assert.ok(await page.locator('.summary .hl-col').count(), '총평 없음');
 assert.equal(await page.locator('.basis-compare .bc-item').count(), 2, '두 기준 점수 비교 없음');
+await page.click('.trace-head');
+assert.ok((await page.locator('.trace-steps li').count()) >= 8, '계산 과정 단계가 모자람');
+assert.ok(await page.locator('.trace-steps li:has-text("합계")').count(), '계산 과정 합계 없음');
 assert.ok(await page.locator('.basis-head:has-text("정통 성명학")').count(), '계산 기준 표시 없음');
 {
   const body = (await page.locator('.summary-body').first().textContent()) ?? '';
@@ -183,7 +186,7 @@ async function twins(mode) {
 }
 await twins('서로 어울리는 세트로');
 await page.waitForSelector('.set-card', { timeout: 40000 });
-assert.ok(await page.locator('.note-soft').count(), '같은 사주 안내 없음');
+assert.ok(await page.locator('.note-soft.two-line:has-text("아이들의 사주가 같아")').count(), '같은 사주 안내 없음');
 assert.equal(await page.locator('.saju-panel').count(), 1, '만세력 하나씩 보기');
 assert.ok(await page.locator('.set-card .harmony-pair').count(), '세트 궁합 없음');
 await twins('아이마다 따로');
@@ -200,14 +203,14 @@ await page.waitForSelector('.pick-card .harmony-pair', { timeout: 20000 });
 assert.ok(await page.locator('.pick-card .harmony-score').count(), '다둥이 궁합 점수 없음');
 console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 
-// 8a) 계산 기준 바꾸기: 정통 성명학 → 일반 작명앱 (다시 계산하고 기준이 바뀐다)
+// 8a) 계산 기준 바꾸기: 정통 성명학 → 실용 작명법 (다시 계산하고 기준이 바뀐다)
 const classicCards = (await page.locator('.name-card').allInnerTexts()).slice(0, 10).join('|');
 await page.click('.basis-head');
 assert.equal(await page.locator('.basis-row').count(), 4, '계산 기준 항목 4개(용신·발음오행·배점·한자오행)');
-await page.click('.basis-body .choice:has-text("일반 작명앱")');
-await page.waitForSelector('.basis-head:has-text("일반 작명앱")', { timeout: 10000 });
+await page.click('.basis-body .bp-item:has-text("실용 작명법")');
+await page.waitForSelector('.basis-head:has-text("실용 작명법")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
-await page.waitForFunction((prev) => [...document.querySelectorAll('.name-card')].slice(0, 10).map((e) => e.innerText).join('|') !== prev, classicCards, { timeout: 40000 }).catch(() => assert.fail('정통·일반 작명앱 기준 결과가 같음'));
+await page.waitForFunction((prev) => [...document.querySelectorAll('.name-card')].slice(0, 10).map((e) => e.innerText).join('|') !== prev, classicCards, { timeout: 40000 }).catch(() => assert.fail('정통·실용 작명법 기준 결과가 같음'));
 if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
 await page.click('.basis-row:has-text("발음오행") .seg button:has-text("해례본")');
 await page.waitForSelector('.basis-head:has-text("부족한 오행 · 해례본")', { timeout: 10000 });
