@@ -10,7 +10,7 @@ import { isPositiveMeaning, teaseWord } from '../name/safety';
 import { soundFlow, vowelYinYang } from '../name/sound';
 import { strokeYinYang } from '../name/suri';
 import type { SajuAnalysis } from '../saju/analysis';
-import { AWKWARD_NAMES, COMMON_NAMES, DISTINCT_NAMES, FAMILIAR_HANJA, POPULAR_NAMES, SYLLABLES } from './syllables';
+import { AWKWARD_NAMES, COMMON_NAMES, DISTINCT_NAMES, FAMILIAR_HANJA, POPULAR_NAMES, RECENT_TOP, SYLLABLES } from './syllables';
 
 export interface Preferences {
   /** 이름 글자 수 (성 제외) */
@@ -32,6 +32,11 @@ export interface Recommendation {
   hangul: string;
   hanja: string;
   report: NameReport;
+  /**
+   * 이름 느낌과 얼마나 맞는지. 0: 고른 느낌의 실제 이름, 1: 다른 느낌의 실제 이름,
+   * 2: 조건 때문에 넓혀 찾은 조합(목록에 없는 이름). 점수와는 상관없고 순서에만 쓴다.
+   */
+  fit?: 0 | 1 | 2;
 }
 
 export interface RecommendArgs {
@@ -77,6 +82,20 @@ function isPopular(hangul: string, gender: Gender): boolean {
   return (gender === 'unknown' ? [...POPULAR_NAMES.female, ...POPULAR_NAMES.male] : POPULAR_NAMES[gender]).includes(hangul);
 }
 
+function isCommon(hangul: string, gender: Gender): boolean {
+  return (gender === 'unknown' ? [...COMMON_NAMES.female, ...COMMON_NAMES.male] : COMMON_NAMES[gender]).includes(hangul);
+}
+
+/** 요즘 많이 쓰는 이름: 최근 인기 이름 + 많이 쓰는 이름 앞쪽 */
+function isRecent(hangul: string, gender: Gender): boolean {
+  if (isPopular(hangul, gender)) return true;
+  const gs = gender === 'unknown' ? (['female', 'male'] as const) : ([gender] as const);
+  return gs.some((g) => {
+    const i = COMMON_NAMES[g].indexOf(hangul);
+    return i >= 0 && i < RECENT_TOP;
+  });
+}
+
 /** 실제로 많이 쓰는 이름 목록(성별 모름이면 둘 다) */
 function knownNames(gender: Gender): Set<string> {
   const gs = gender === 'unknown' ? (['female', 'male'] as const) : ([gender] as const);
@@ -84,23 +103,47 @@ function knownNames(gender: Gender): Set<string> {
 }
 
 /**
- * 어색한 조합 거르기. 한자 점수가 아무리 좋아도 실제로 잘 쓰지 않는 이름은 내지 않는다.
- * - 낱말처럼 들리는 이름(하지·지하·이유·유린…)은 언제나 뺀다.
- * - 두 글자 이름은 이름 느낌과 상관없이 실제로 쓰는 이름 목록(많이 쓰는·인기·개성 있는) 안에서만 고른다.
- *   '흔하지 않은'은 그 목록 안에서 덜 흔한 이름을 앞에 둔다(preferenceOf).
- * - 돌림자 등으로 후보가 너무 적을 때만(relaxed) 아주 흔한 음절끼리의 조합(가중치 합 5 이상)을 더한다.
+ * 이름 느낌별 우선순위(0이 가장 잘 맞음). 세 느낌이 서로 다른 이름을 먼저 내도록 목록을 나눈다.
+ * - 요즘 많이 쓰는: 요즘 인기 이름 → 오래 써 온 이름 → 개성 있는 이름
+ * - 무난한: 오래 써 온 친숙한 이름 → 나머지
+ * - 흔하지 않은: 개성 있는 이름 → 오래 써 온 이름 → 요즘 인기 이름
  */
-function isNatural(weights: number[], hangul: string, _gender: Gender, _style: Preferences['style'], known: Set<string>, relaxed: boolean): boolean {
+function styleTier(hangul: string, gender: Gender, style: Preferences['style']): number {
+  if ([...hangul].length < 2) return 0;
+  const recent = isRecent(hangul, gender);
+  const distinct = isDistinct(hangul, gender);
+  const classic = isCommon(hangul, gender) && !recent;
+  if (style === 'popular') return recent ? 0 : classic && !distinct ? 1 : 2;
+  if (style === 'unique') return distinct && !recent ? 0 : recent ? 2 : 1;
+  return classic && !distinct ? 0 : 1;
+}
+
+/**
+ * 후보를 얼마나 넓게 찾을지. 조건(돌림자·포함·제외 등) 때문에 좋은 이름이 없을 때만 한 단계씩 넓힌다.
+ * 0: 고른 느낌의 실제 이름  1: 실제로 쓰는 이름 전체  2: + 아주 흔한 음절끼리 조합(가중치 합 5 이상)
+ * 3: + 이름 음절 조합(가중치 합 3 이상)  4: 3과 같되 '아쉬운 이름 미리 빼기'를 잠시 끈다
+ */
+type Level = 0 | 1 | 2 | 3 | 4;
+
+/** 어색한 조합 거르기. 낱말처럼 들리는 이름(하지·지하·이유·유린…)은 어느 단계에서도 뺀다 */
+function allowedAt(level: Level, weights: number[], hangul: string, known: Set<string>, tier: number): boolean {
   if (AWKWARD_NAMES.has(hangul)) return false;
   if (weights.length < 2) return true;
-  if (known.has(hangul)) return true;
-  return relaxed && weights.reduce((a, b) => a + b, 0) >= 5;
+  if (known.has(hangul)) return level >= 1 || tier === 0;
+  const sum = weights.reduce((a, b) => a + b, 0);
+  return (level >= 2 && sum >= 5) || (level >= 3 && sum >= 3);
 }
+
+const GRADE_RANK: Record<string, number> = { S: 4, A: 3, B: 2, C: 1, D: 0 };
+/** 느낌에 맞는 이름만으로 이만큼 S등급이 나오면 다른 느낌 이름은 섞지 않는다 */
+const STYLE_TARGET = 8;
 
 interface HangulCandidate {
   syllables: string[];
   hangul: string;
   pre: number;
+  tier: number;
+  known: boolean;
   soundPts: number;
   vowelPts: number;
   practicalSound: number;
@@ -133,7 +176,9 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
 /**
  * 이름 추천 (설계서 10절). 난수 없음: 같은 입력이면 항상 같은 순서.
  * 1) 음절 조합 → 소리 규칙으로 한글 이름 상위 1,500개  2) 음절별 한자 상위 12개
- * 3) 4격·채점 → 한글 이름당 상위 2개 조합  4) 상위 limit개를 정식 분석(analyzeName)으로 확정
+ * 3) 4격·채점 → 한글 이름당 상위 2개 조합  4) 상위 후보를 정식 분석(analyzeName)으로 확정
+ * 고른 이름 느낌의 실제 이름부터 찾고, 좋은 이름이 모자라면 한 단계씩 넓힌다(Level).
+ * 순서: 등급 → 이름 느낌 → 점수.
  */
 export function recommendNames(args: RecommendArgs): Recommendation[] {
   const { surname, gender, saju, prefs, options } = args;
@@ -176,8 +221,10 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
       seen.add(name);
     }
   }
-  const build = (relaxed: boolean): HangulCandidate[] => {
-  const hangulCands: HangulCandidate[] = [];
+
+  // 단계와 상관없는 거르기(조건·소리)는 한 번만 계산한다
+  interface Base extends HangulCandidate { weights: number[]; clash: boolean }
+  const bases: Base[] = [];
   for (const combo of combos) {
     const syl = combo.map(([s]) => s);
     if (syl.some((s, i) => i > 0 && s === syl[i - 1])) continue;
@@ -186,35 +233,30 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     if (syl.some((s) => exclude.has(s) && !(prefs.fixed && s === prefs.fixed.hangul))) continue;
     if (syl.some((s) => excludeInitials.has(decompose(s)?.initial ?? ''))) continue;
     if (include.length > 0 && !syl.some((s) => include.includes(s))) continue;
-    const hangulName = syl.join('');
-    if (!isNatural(combo.map(([, w]) => w), hangulName, gender, prefs.style, known, relaxed)) continue;
+    const hangul = syl.join('');
+    if (AWKWARD_NAMES.has(hangul)) continue;
     const all = [...surSyl, ...syl];
     if (teaseWord(all.join(''))) continue;
     const flow = soundFlow(all, options.soundSchool, options.includeFinalConsonant);
-    if (options.strictMode && flow.pairs.some((p) => p.kind === 'clash')) continue;
+    let clash = flow.pairs.some((p) => p.kind === 'clash');
     if (options.bothSchoolsNoClash) {
       const other = options.soundSchool === 'haerye' ? 'unhae' : 'haerye';
-      if (flow.pairs.some((p) => p.kind === 'clash')) continue;
-      if (soundFlow(all, other, options.includeFinalConsonant).pairs.some((p) => p.kind === 'clash')) continue;
+      clash = clash || soundFlow(all, other, options.includeFinalConsonant).pairs.some((p) => p.kind === 'clash');
     }
     const vowel = vowelYinYang(all);
     const pronChanged = pronounce(all).join('') !== all.join('');
     const practicalSound = 4 - (pronChanged ? 2 : 0);
-    const hangul = syl.join('');
-    const preference = preferenceOf(combo.map(([, w]) => w), hangul, gender, prefs.style);
+    const weights = combo.map(([, w]) => w);
+    const preference = preferenceOf(weights, hangul, gender, prefs.style);
     const soundPts = flow.score * 20;
     const vowelPts = vowel.score * 4;
-    hangulCands.push({
-      syllables: syl, hangul, soundPts, vowelPts, practicalSound, preference,
+    bases.push({
+      syllables: syl, hangul, soundPts, vowelPts, practicalSound, preference, weights, clash,
+      tier: styleTier(hangul, gender, prefs.style), known: known.has(hangul) || syl.length < 2,
       pre: soundPts + vowelPts + practicalSound + preference * 3,
     });
   }
-  return hangulCands;
-  };
-  let hangulCands = build(false);
-  if (hangulCands.length < 40) hangulCands = build(true);
-  hangulCands.sort((a, b) => b.pre - a.pre || cmpCodePoints(a.hangul, b.hangul));
-  const kept = hangulCands.slice(0, HANGUL_KEEP);
+  bases.sort((a, b) => b.pre - a.pre || cmpCodePoints(a.hangul, b.hangul));
 
   // 2) 음절별 한자 후보 (캐시)
   const cache = new Map<string, HanjaEntry[]>();
@@ -232,52 +274,101 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     return v;
   };
 
-  // 3) 조합 채점
-  interface Scored { hangul: string; hanja: string; entries: HanjaEntry[]; total: number }
-  const scored: Scored[] = [];
-  for (const hc of kept) {
+  // 3) 조합 채점 (한글 이름마다 한 번만, 엄격 모드 통과 여부는 따로 적어 둔다)
+  interface Scored { hangul: string; hanja: string; entries: HanjaEntry[]; total: number; strictOk: boolean }
+  const scoredCache = new Map<string, Scored[]>();
+  const scoreHangul = (hc: Base, strict: boolean): Scored[] => {
+    const key = `${hc.hangul}:${strict ? 1 : 0}`;
+    const hit = scoredCache.get(key);
+    if (hit) return hit;
     const lists = hc.syllables.map((s, i) => candidatesFor(s, i));
-    if (lists.some((l) => l.length === 0)) continue;
-    let combosH: HanjaEntry[][] = [[]];
-    for (const l of lists) {
-      const next: HanjaEntry[][] = [];
-      for (const c of combosH) for (const h of l) next.push([...c, h]);
-      combosH = next;
-    }
     const best: Scored[] = [];
-    for (const entries of combosH) {
-      const strokes = entries.map((h) => h.strokes);
-      const suri = suriPointsFor(surStrokes, strokes, gender, options);
-      if (options.strictMode && !suri.noBad) continue;
-      const resource = resourcePointsFor(entries, saju);
-      const syy = strokeYinYang([...(surEntries as HanjaEntry[]).map((h) => h.strokes), ...strokes]).balanced ? 6 : 0;
-      const bulyong = entries.some((h) => h.bulyong) ? 0 : 3;
-      const total = resource + suri.points + hc.soundPts + syy + hc.vowelPts + 5 + bulyong + hc.practicalSound + hc.preference * 3;
-      best.push({ hangul: hc.hangul, hanja: entries.map((h) => h.ch).join(''), entries, total });
+    if (!lists.some((l) => l.length === 0)) {
+      let combosH: HanjaEntry[][] = [[]];
+      for (const l of lists) {
+        const next: HanjaEntry[][] = [];
+        for (const c of combosH) for (const h of l) next.push([...c, h]);
+        combosH = next;
+      }
+      for (const entries of combosH) {
+        const strokes = entries.map((h) => h.strokes);
+        const suri = suriPointsFor(surStrokes, strokes, gender, options);
+        if (strict && !suri.noBad) continue;
+        const resource = resourcePointsFor(entries, saju);
+        const syy = strokeYinYang([...(surEntries as HanjaEntry[]).map((h) => h.strokes), ...strokes]).balanced ? 6 : 0;
+        const bulyong = entries.some((h) => h.bulyong) ? 0 : 3;
+        // 실용 점수의 이름 느낌 몫(3점)은 정식 분석과 똑같이 늘 만점으로 둔다
+        const total = resource + suri.points + hc.soundPts + syy + hc.vowelPts + 5 + bulyong + hc.practicalSound + 3;
+        best.push({ hangul: hc.hangul, hanja: entries.map((h) => h.ch).join(''), entries, total, strictOk: suri.noBad && !hc.clash });
+      }
+      best.sort((a, b) => b.total - a.total || cmpCodePoints(a.hanja, b.hanja));
     }
-    best.sort((a, b) => b.total - a.total || cmpCodePoints(a.hanja, b.hanja));
-    scored.push(...best.slice(0, 2));
-  }
-  scored.sort((a, b) => b.total - a.total || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja));
+    const top = best.slice(0, 2);
+    scoredCache.set(key, top);
+    return top;
+  };
 
-  // 4) 정식 분석으로 확정
-  // 점수는 '이름 풀어보기'와 똑같이 매긴다(같은 이름이면 어디서나 같은 점수).
-  // 이름 느낌(인기·특별) 선호는 후보 고르기와 같은 점수 안의 순서에만 쓴다.
-  const out: (Recommendation & { pref: number })[] = [];
-  for (const s of scored.slice(0, limit)) {
-    const given = [...s.hangul].map((h, i) => ({ hangul: h, hanja: s.entries[i]?.ch ?? null }));
-    const pref = hangulCands.find((c) => c.hangul === s.hangul)?.preference ?? 1;
-    const report = analyzeName({ surname, given, gender }, saju, options);
-    out.push({ hangul: `${surSyl.join('')}${s.hangul}`, hanja: `${surname.map((c) => c.hanja).join('')}${s.hanja}`, report, pref });
+  // 4) 정식 분석 (같은 이름이면 '이름 풀어보기'와 똑같은 점수)
+  const reportCache = new Map<string, NameReport>();
+  const analyze = (s: Scored): NameReport => {
+    let r = reportCache.get(s.hanja + s.hangul);
+    if (!r) {
+      const given = [...s.hangul].map((h, i) => ({ hangul: h, hanja: s.entries[i]?.ch ?? null }));
+      r = analyzeName({ surname, given, gender }, saju, options);
+      reportCache.set(s.hanja + s.hangul, r);
+    }
+    return r;
+  };
+
+  type Out = Recommendation & { pref: number; tier: number };
+  const run = (level: Level): { out: Out[]; size: number } => {
+    const strict = options.strictMode && level < 4;
+    const kept = bases
+      .filter((b) => !(strict && b.clash) && allowedAt(level, b.weights, b.hangul, known, b.tier))
+      .slice(0, HANGUL_KEEP);
+    const byHangul = new Map(kept.map((b) => [b.hangul, b]));
+    const scored = kept.flatMap((b) => scoreHangul(b, strict));
+    scored.sort((a, b) => b.total - a.total || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja));
+    const out: Out[] = scored.slice(0, Math.max(limit * 2, 60)).map((s) => {
+      const b = byHangul.get(s.hangul) as Base;
+      return {
+        hangul: `${surSyl.join('')}${s.hangul}`,
+        hanja: `${surname.map((c) => c.hanja).join('')}${s.hanja}`,
+        report: analyze(s),
+        fit: !b.known ? 2 : b.tier === 0 ? 0 : 1,
+        pref: b.preference,
+        tier: b.known ? b.tier : 9,
+      };
+    });
+    out.sort(
+      (a, b) =>
+        (GRADE_RANK[b.report.score.grade] ?? 0) - (GRADE_RANK[a.report.score.grade] ?? 0) ||
+        a.tier - b.tier ||
+        b.report.score.total - a.report.score.total ||
+        b.pref - a.pref ||
+        cmpCodePoints(a.hangul, b.hangul) ||
+        cmpCodePoints(a.hanja, b.hanja),
+    );
+    return { out: out.slice(0, limit), size: kept.length };
+  };
+
+  const sCount = (rs: Out[]) => new Set(rs.filter((r) => r.report.score.grade === 'S').map((r) => r.hangul)).size;
+  const topRank = (rs: Out[]) => (rs.length ? Math.max(...rs.map((r) => GRADE_RANK[r.report.score.grade] ?? 0)) : -1);
+  let best: Out[] = [];
+  for (const level of [0, 1, 2, 3] as const) {
+    const { out, size } = run(level);
+    if (level === 0 && sCount(out) >= STYLE_TARGET) return strip(out);
+    // 돌림자 등으로 실제 이름 후보가 너무 적으면(40개 미만) 흔한 음절 조합까지 본다
+    if (level >= 1 && sCount(out) > 0 && (level >= 2 || size >= 40)) return strip(out);
+    if (topRank(out) > topRank(best)) best = out;
   }
-  out.sort(
-    (a, b) =>
-      b.report.score.total - a.report.score.total ||
-      b.pref - a.pref ||
-      cmpCodePoints(a.hangul, b.hangul) ||
-      cmpCodePoints(a.hanja, b.hanja),
-  );
-  return out.map(({ pref: _pref, ...r }) => r);
+  // 조건을 다 지키는 이름이 하나도 없을 때만 '아쉬운 이름 미리 빼기'를 풀고 가장 나은 이름을 보여 준다
+  if (best.length === 0 && options.strictMode) best = run(4).out;
+  return strip(best);
+}
+
+function strip(rs: (Recommendation & { pref: number; tier: number })[]): Recommendation[] {
+  return rs.map(({ pref: _p, tier: _t, ...r }) => r);
 }
 
 export type { Element };

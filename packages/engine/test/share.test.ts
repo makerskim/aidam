@@ -21,7 +21,7 @@ describe('공개 API', () => {
     for (const k of ['computeSaju', 'analyzeName', 'recommendNames', 'analyzeSiblings', 'recommendSiblingSets', 'suggestBetterHanja', 'SURNAMES', 'PLACES', 'hanjaByReading']) {
       expect(engine).toHaveProperty(k);
     }
-    expect(engine.ENGINE_VERSION).toBe('1.2.0');
+    expect(engine.ENGINE_VERSION).toBe('1.3.0');
   });
 });
 

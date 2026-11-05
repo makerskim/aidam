@@ -182,6 +182,39 @@ await page.waitForSelector('.pick-card .harmony-pair', { timeout: 20000 });
 assert.ok(await page.locator('.pick-card .harmony-score').count(), '다둥이 궁합 점수 없음');
 console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 
+// 8b) 이름 느낌마다 다른 이름 · 돌림자를 걸어도 추천이 비지 않음
+async function single(style, fixed) {
+  await page.goto(`${BASE}/#/name`);
+  await page.waitForSelector('#surname');
+  await page.fill('#surname', '김');
+  await page.click('button:has-text("다음")');
+  await page.click('button.tile:has-text("새 이름 추천받기")');
+  await page.click('.wizard-actions button:has-text("다음")');
+  await page.click('button.tile:has-text("한 명")');
+  await page.click('.wizard-actions button:has-text("다음")');
+  await page.click('button.tile:has-text("여자아이")');
+  await page.click('.wizard-actions button:has-text("다음")');
+  await birth(page, 'baby', '20260314', '0930');
+  await page.click('button:has-text("다음")');
+  await page.click(`.seg button:has-text("${style}")`);
+  await page.fill('#fixed', fixed ? fixed[0] : '');
+  if (fixed) await page.click(`[aria-label="${fixed[0]} 한자"] .hanja-opt:has-text("${fixed[1]}")`);
+  await page.click('button:has-text("이름 추천받기")');
+  await page.waitForSelector('.name-card', { timeout: 40000 });
+  return page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
+}
+const popularNames = await single('요즘 많이 쓰는');
+const uniqueNames = await single('흔하지 않은');
+const balancedNames = await single('무난한');
+assert.notEqual(popularNames[0], uniqueNames[0], '이름 느낌을 바꿔도 첫 이름이 같음');
+assert.notEqual(popularNames[0], balancedNames[0], '요즘 많이 쓰는·무난한 첫 이름이 같음');
+assert.notDeepEqual(popularNames.slice(0, 10), uniqueNames.slice(0, 10), '이름 느낌을 바꿔도 목록이 같음');
+const fixedNames = await single('무난한', ['희', '熙']);
+assert.ok(fixedNames.length > 0, '돌림자를 걸면 추천이 비어 있음');
+assert.ok(fixedNames.every((n) => n.trim().endsWith('희')), `돌림자 위치: ${fixedNames.slice(0, 3)}`);
+await page.fill('#fixed', '').catch(() => {});
+console.log(`✓ 이름 느낌별 다른 이름(${popularNames[0]} / ${balancedNames[0]} / ${uniqueNames[0]}) · 돌림자 '희' ${fixedNames.length}개`);
+
 // 9) 정한 이름 풀어보기(작명 흐름 안) → 아쉬운 항목 → 고치기 옵션
 await page.goto(`${BASE}/#/name?check=1`);
 await page.reload();
@@ -237,6 +270,13 @@ await m.click('.wizard-actions button:has-text("다음")');
 await m.click('button.tile:has-text("한 명")');
 await m.click('.wizard-actions button:has-text("다음")');
 await m.click('button.tile:has-text("남자아이")');
+// 모바일에서도 '다음' 버튼은 화면 맨 아래가 아니라 고르는 칸 바로 아래에 있다
+assert.notEqual(await m.locator('.wizard-actions').evaluate((el) => getComputedStyle(el).position), 'fixed', '다음 버튼이 화면 아래에 고정됨');
+{
+  const tile = await m.locator('button.tile').last().boundingBox();
+  const btn = await m.locator('.wizard-actions button').boundingBox();
+  assert.ok(tile && btn && btn.y - (tile.y + tile.height) < 90, `다음 버튼이 칸에서 멀리 떨어짐 (${btn && tile ? Math.round(btn.y - tile.y - tile.height) : '?'}px)`);
+}
 await m.click('.wizard-actions button:has-text("다음")');
 await m.fill('#baby-date', '20230230');
 assert.ok(await m.locator('.df-hint:has-text("없는 날짜")').count(), '없는 날짜 표시');
