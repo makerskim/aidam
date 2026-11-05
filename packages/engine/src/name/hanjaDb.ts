@@ -2,7 +2,7 @@ import type { Element } from '../core/elements';
 import raw from '../data/hanja-raw.json';
 import { applyDueum } from '../hangul/dueum';
 import { computeWonStrokes, primaryRadical } from './strokes';
-import { resourceElementOf, type Confidence } from './resourceElement';
+import { resourceElementByMeaning, resourceElementOf, type Confidence } from './resourceElement';
 import { BULYONG, isNegativeMeaning } from './safety';
 
 export interface HanjaEntry {
@@ -15,6 +15,8 @@ export interface HanjaEntry {
   element: Element;
   elementBasis: string;
   elementConfidence: Confidence;
+  /** 뜻 우선으로 본 오행(한자오행 '뜻 기준'을 고르면 이것을 쓴다) */
+  byMeaning: { element: Element; basis: string; confidence: Confidence };
   /** 대법원 인명용 추가 한자 */
   nameUse: boolean;
   /** 교육용 기초한자(인명용에 포함) */
@@ -42,6 +44,7 @@ function build(row: RawRow): HanjaEntry {
     element: el.element,
     elementBasis: el.basis,
     elementConfidence: el.confidence,
+    byMeaning: resourceElementByMeaning(ch, radical, meaning, strokes),
     nameUse: (flags & 1) === 1,
     edu: (flags & 2) === 2,
     negative: isNegativeMeaning(meaning),
@@ -92,3 +95,9 @@ export function hanjaByReading(syllable: string, opts: { initial?: boolean } = {
 
 /** 이름 둘째 글자 이후에 율·열로 읽는 률·렬 */
 export const MID_LIQUID: Readonly<Record<string, string>> = { 율: '률', 열: '렬' };
+
+/** 고른 한자오행 기준(부수 우선 / 뜻 우선)으로 오행을 바꾼 한자 */
+export function entryForBasis(h: HanjaEntry, basis: 'radical' | 'meaning' | undefined): HanjaEntry {
+  if (basis !== 'meaning' || h.byMeaning.element === h.element) return h;
+  return { ...h, element: h.byMeaning.element, elementBasis: h.byMeaning.basis, elementConfidence: h.byMeaning.confidence };
+}

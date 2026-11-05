@@ -102,6 +102,8 @@ assert.equal(await page.locator('.crit-row:not(.sub)').count(), 5, '항목 수')
 assert.ok(await page.locator('.report .saju-panel').count(), '리포트에 만세력 없음');
 assert.ok(await page.locator('.topbar >> text=한자 바꿔 보기').count(), '맨 위 한자 바꿔 보기 없음');
 assert.ok(await page.locator('.summary .hl-col').count(), '총평 없음');
+assert.equal(await page.locator('.basis-compare .bc-item').count(), 2, '두 기준 점수 비교 없음');
+assert.ok(await page.locator('.basis-head:has-text("정통 성명학")').count(), '계산 기준 표시 없음');
 {
   const body = (await page.locator('.summary-body').first().textContent()) ?? '';
   assert.ok(/바라는|바람/.test(body), `총평에 이름의 바람이 없음: ${body.slice(0, 60)}`);
@@ -188,6 +190,18 @@ await page.locator('.name-card .nc-pick:not([disabled])').first().click();
 await page.waitForSelector('.pick-card .harmony-pair', { timeout: 20000 });
 assert.ok(await page.locator('.pick-card .harmony-score').count(), '다둥이 궁합 점수 없음');
 console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
+
+// 8a) 계산 기준 바꾸기: 정통 성명학 → 일반 작명앱 (다시 계산하고 기준이 바뀐다)
+await page.click('.basis-head');
+assert.equal(await page.locator('.basis-row').count(), 4, '계산 기준 항목 4개(용신·발음오행·수리오행·한자오행)');
+await page.click('.basis-body .choice:has-text("일반 작명앱")');
+await page.waitForSelector('.basis-head:has-text("일반 작명앱")', { timeout: 10000 });
+await page.waitForSelector('.name-card', { timeout: 40000 });
+if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
+await page.click('.basis-row:has-text("발음오행") .seg button:has-text("해례본")');
+await page.waitForSelector('.basis-head:has-text("부족한 오행 · 해례본")', { timeout: 10000 });
+await page.waitForSelector('.name-card', { timeout: 40000 });
+console.log('✓ 계산 기준 고르기(묶음·항목별)');
 
 // 8b) 이름 느낌마다 다른 이름 · 돌림자를 걸어도 추천이 비지 않음
 async function single(style, fixed) {

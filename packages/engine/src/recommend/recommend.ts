@@ -5,7 +5,8 @@ import { pronounce } from '../hangul/pronounce';
 import {
   analyzeName, resourcePointsFor, suriPointsFor, type Gender, type NameChar, type NameReport, type SchoolOptions,
 } from '../name/analyze';
-import { getHanja, hanjaByReading, isNameHanja, MID_LIQUID, type HanjaEntry } from '../name/hanjaDb';
+import { entryForBasis, getHanja, hanjaByReading, isNameHanja, MID_LIQUID, type HanjaEntry } from '../name/hanjaDb';
+import { sajuForMethod } from '../saju/analysis';
 import { isPositiveMeaning, teaseWord } from '../name/safety';
 import { HANJA_STORY } from '../name/stories';
 import { soundFlow, vowelYinYang } from '../name/sound';
@@ -158,7 +159,7 @@ function primaryReadingMatches(h: HanjaEntry, syllable: string, initial: boolean
 }
 
 function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis | null, options: SchoolOptions): HanjaEntry[] {
-  const base = hanjaByReading(syllable, { initial: position === 0 }).filter(
+  const base = hanjaByReading(syllable, { initial: position === 0 }).map((h) => entryForBasis(h, options.hanjaElement)).filter(
     (h) =>
       isNameHanja(h) && !h.negative && h.meaning !== '' && !(options.excludeBulyong && h.bulyong) &&
       primaryReadingMatches(h, syllable, position === 0) &&
@@ -188,7 +189,8 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
  * 순서: 이름 느낌 → 등급 → 점수. 고른 느낌의 이름이 30개 이상이면 그 이름만 낸다.
  */
 export function recommendNames(args: RecommendArgs): Recommendation[] {
-  const { surname, gender, saju, prefs, options } = args;
+  const { surname, gender, prefs, options } = args;
+  const saju = sajuForMethod(args.saju, options.yongsinMethod);
   const limit = args.limit ?? 100;
   const surSyl = surname.map((c) => c.hangul);
   const surEntries = surname.map((c) => (c.hanja ? getHanja(c.hanja) : undefined));
@@ -271,7 +273,7 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   const candidatesFor = (s: string, pos: number): HanjaEntry[] => {
     if (prefs.fixed && pos === prefs.fixed.position && s === prefs.fixed.hangul) {
       const h = getHanja(prefs.fixed.hanja);
-      return h ? [h] : [];
+      return h ? [entryForBasis(h, options.hanjaElement)] : [];
     }
     const k = `${s}:${pos === 0 ? 1 : 0}`;
     let v = cache.get(k);
@@ -394,10 +396,11 @@ export type { Element };
  */
 export function suggestBetterHanja(
   input: { surname: NameChar[]; given: NameChar[]; gender: Gender },
-  saju: SajuAnalysis | null,
+  sajuIn: SajuAnalysis | null,
   options: SchoolOptions,
   limit = 3,
 ): Recommendation[] {
+  const saju = sajuForMethod(sajuIn, options.yongsinMethod);
   const current = analyzeName(input, saju, options);
   const lists = input.given.map((g, i) => {
     const list = hanjaCandidates(g.hangul, i, saju, options);

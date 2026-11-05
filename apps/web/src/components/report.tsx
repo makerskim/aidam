@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { NameReport, Recommendation, SajuResult, PillarsResult } from '@aidam/engine';
+import type { NameReport, Recommendation, SajuResult, PillarsResult, SchoolOptions } from '@aidam/engine';
 import { ELEMENT_HANJA, ELEMENTS, type Element } from '@aidam/engine/src/core/elements';
 import { BRANCHES, STEMS, branchElement, stemElement, ZODIAC_KO } from '@aidam/engine/src/core/ganji';
 import { hanjaMeaning } from '../lib/format';
+import { PRESET_LABEL, presetOf, withPreset } from '../lib/basis';
 import { explainCriteria, nameHighlights, nameNarrative, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, tidy, type Criterion, type SajuRow } from '../lib/insights';
 import { Rich } from './rich';
 import { useLibrary } from '../lib/library';
@@ -362,7 +363,28 @@ const GRADE_LINE: Record<string, string> = {
   D: '아쉬운 점이 많은 이름이에요.',
 };
 
-export function ReportView({ report, saju, better, query }: { report: NameReport; saju: SajuResult | null; better: Recommendation[]; query: string }) {
+export interface BasisScore {
+  key: 'classic' | 'app';
+  total: number;
+  grade: string;
+  partial: boolean;
+}
+
+export function ReportView({
+  report,
+  saju,
+  better,
+  query,
+  compare,
+  onSchool,
+}: {
+  report: NameReport;
+  saju: SajuResult | null;
+  better: Recommendation[];
+  query: string;
+  compare?: BasisScore[];
+  onSchool?: (s: SchoolOptions) => void;
+}) {
   const lib = useLibrary();
   const gate = useGate();
   const location = useLocation();
@@ -450,6 +472,31 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
           <span className={`verdict-line ${VERDICT_OF_GRADE[report.score.grade] ?? 'ok'}`}>{VERDICT_WORD[report.score.grade] ?? ''}</span>
         </div>
       </section>
+
+      {compare?.length ? (
+        <section className="card basis-compare" aria-label="두 기준 점수 비교">
+          <span className="section-kicker">두 기준으로 보면</span>
+          <div className="bc-row">
+            {compare.map((c) => {
+              const on = presetOf(report.options) === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`bc-item ${on ? 'on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => onSchool?.(withPreset(report.options, c.key))}
+                >
+                  <span>{PRESET_LABEL[c.key]}</span>
+                  <b className="num">{Math.round(c.total)}점</b>
+                  <span className={`grade-pill g-${c.grade}`}>{c.grade}등급</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="small muted">누르면 그 기준으로 자세한 풀이를 다시 보여 드려요. 항목마다 따로 고르려면 위의 ‘계산 기준’을 여세요.</p>
+        </section>
+      ) : null}
 
       <section className="card summary" aria-label="총평">
         <span className="section-kicker">총평</span>

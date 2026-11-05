@@ -14,13 +14,18 @@ import {
   isPositiveMeaning,
   recommendNames,
   recommendSiblingSets,
+  sajuForMethod,
   suggestBetterHanja,
   SURNAMES,
   surnameStrokes,
   type BirthInput,
   type NameChar,
+  type SajuAnalysis,
   type SajuOptions,
+  type SajuResult,
+  type SchoolOptions,
 } from '@aidam/engine';
+import { PRESETS } from './basis';
 import { FAMILIAR_HANJA } from '@aidam/engine/src/recommend/syllables';
 import type { AnalyzeState, NameState } from './state';
 import { KID_LABELS, kidBirth, surnameChars } from './state';
@@ -41,6 +46,15 @@ export interface HanjaOption {
 /** 자주 쓰는 한자 목록의 순서(앞일수록 이름에 흔히 씀) */
 const FAMILIAR_ORDER = new Map([...FAMILIAR_HANJA].map((c, i) => [c, i]));
 
+/** 고른 용신 방법으로 사주 풀이를 바꾼다(만세력 화면과 이름 채점이 같은 용신을 쓰게) */
+function sajuWith(birth: BirthInput, opts: SajuOptions, school: SchoolOptions): SajuResult {
+  const r = computeSaju(birth, opts);
+  const m = school.yongsinMethod;
+  if (m !== 'lacking') return r;
+  const t = (a: SajuAnalysis) => sajuForMethod(a, m) as SajuAnalysis;
+  return { ...r, primary: t(r.primary), alternatives: r.alternatives.map((x) => ({ ...x, analysis: t(x.analysis) })) };
+}
+
 export const api = {
   init() {
     const surnames = SURNAMES.map((s) => ({ ...s, strokes: surnameStrokes(s.hanja), meaning: [...s.hanja].map((ch) => getHanja(ch)?.meaning ?? '').join(' / ') }));
@@ -50,7 +64,7 @@ export const api = {
     return computeSaju(birth, opts);
   },
   recommend(state: NameState) {
-    const saju = state.birth ? computeSaju(state.birth, state.sajuOpts) : null;
+    const saju = state.birth ? sajuWith(state.birth, state.sajuOpts, state.school) : null;
     const recs = recommendNames({
       surname: surnameChars(state.surname),
       gender: state.gender,
@@ -69,7 +83,7 @@ export const api = {
       gender: k.gender,
       birth: state.birth ? { ...state.birth, time: k.time } : null,
     }));
-    const sajus = children.map((c) => (c.birth ? computeSaju(c.birth, state.sajuOpts) : null));
+    const sajus = children.map((c) => (c.birth ? sajuWith(c.birth, state.sajuOpts, state.school) : null));
     const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 20);
     const sameSaju = sajus.length > 1 && sajus.every((s) => s && JSON.stringify(s.base.pillars) === JSON.stringify(sajus[0]?.base.pillars));
     return { sajus, sets, sameSaju };
@@ -82,7 +96,7 @@ export const api = {
     const kids = state.kids ?? [];
     const out = kids.map((k, i) => {
       const birth = state.birth ? { ...state.birth, time: k.time } : null;
-      const saju = birth ? computeSaju(birth, state.sajuOpts) : null;
+      const saju = birth ? sajuWith(birth, state.sajuOpts, state.school) : null;
       const recs = recommendNames({ surname: surnameChars(state.surname), gender: k.gender, saju: saju?.primary ?? null, prefs: state.prefs, options: state.school, limit: 100 });
       return { label: KID_LABELS[i] ?? `${i + 1}`, gender: k.gender, saju, recs };
     });
@@ -98,12 +112,18 @@ export const api = {
     return { pairs: r.pairs, total: r.total };
   },
   analyze(state: AnalyzeState) {
-    const saju = state.birth ? computeSaju(state.birth, state.sajuOpts) : null;
+    const saju = state.birth ? sajuWith(state.birth, state.sajuOpts, state.school) : null;
     const input = { surname: surnameChars(state.surname), given: state.given, gender: state.gender };
     const report = analyzeName(input, saju?.primary ?? null, state.school);
     const allHanja = state.given.every((g) => g.hanja);
     const better = allHanja ? suggestBetterHanja(input, saju?.primary ?? null, state.school, 20) : [];
-    return { saju, report, better };
+    // 같은 이름을 두 기준(정통 성명학·일반 작명앱)으로 함께 채점해 비교해 보여 준다
+    const base = state.birth ? computeSaju(state.birth, state.sajuOpts).primary : null;
+    const compare = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => {
+      const r = analyzeName(input, base, { ...state.school, ...(PRESETS[k] as unknown as Partial<SchoolOptions>) });
+      return { key: k, total: r.score.total, grade: r.score.grade, partial: r.score.partial };
+    });
+    return { saju, report, better, compare };
   },
   /** 셀프 작명용 한자 후보 (친숙·좋은 뜻·인명용 순) */
   hanjaOptions(syllable: string, initial: boolean, birth: BirthInput | null, opts: SajuOptions): HanjaOption[] {

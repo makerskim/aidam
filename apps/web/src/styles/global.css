@@ -3282,3 +3282,111 @@ img {
     display: none;
   }
 }
+
+/* 계산 기준 고르기 */
+.basis {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  margin: 4px 0 18px;
+}
+.basis-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+}
+.basis-head b {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+.basis-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-3);
+}
+.basis-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.basis.open .basis-change svg {
+  transform: rotate(180deg);
+}
+.basis-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 16px 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.basis-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.basis-row b {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.basis-row p {
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.basis-row .seg button {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+/* 두 기준 점수 비교 */
+.basis-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.bc-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+}
+.bc-item b {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ink);
+}
+.bc-item.on {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}

@@ -570,7 +570,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
     out.push({
       key: 'yongsin',
       title: '용신 오행에 맞나요',
-      why: '사주에 꼭 필요한 기운(용신)과 이를 돕는 기운(희신)을 이름 한자의 오행(자원오행)으로 채우는지 봐요. 사주에 넘치는 기운(기신·구신)은 피해요.',
+      why: `사주에 꼭 필요한 기운(용신)과 이를 돕는 기운(희신)을 이름 한자의 오행(자원오행)으로 채우는지 봐요. 사주에 넘치는 기운(기신·구신)은 피해요. 용신은 ${a?.method === 'lacking' ? '여덟 글자 중 적은 오행(부족한 오행 방식)' : '사주 힘의 강약과 계절(억부·조후)'}으로 정했고, 한자 오행은 ${report.options.hanjaElement === 'meaning' ? '뜻' : '부수'}을 먼저 봤어요.`,
       ...(table ? { table } : {}),
       verdict: a ? verdictOf(ratio) : 'ok',
       verdictText: a ? VERDICT_TEXT[verdictOf(ratio)] : '생일 필요',
@@ -610,7 +610,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       table,
       key: 'sound',
       title: '부를 때 소리가 어울리나요',
-      why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. 학설이 둘(해례본·운해본)이라 둘 다 보여 드려요. 점수는 해례본 기준이에요.${known.length ? '' : ''}`,
+      why: `이름 첫소리(ㄱ·ㄴ·ㅁ…)마다 나무·불·흙·쇠·물 기운이 있어요. 성부터 이름까지 서로 살려 주면 좋아요. 학설이 둘(해례본·운해본)이라 둘 다 보여 드려요. 점수는 ${school === 'unhae' ? '운해본' : '해례본'} 기준이에요(계산 기준에서 바꿀 수 있어요).${known.length ? '' : ''}`,
       verdict: verdictOf(s.sound / 20),
       verdictText: VERDICT_TEXT[verdictOf(s.sound / 20)],
       pros,
@@ -636,7 +636,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
     out.push({
       key: 'suri',
       title: '획수로 본 평생 운',
-      why: '성과 이름 한자의 획수를 더해 초년·청년·장년·말년 네 시기의 운을 봐요(81수리).',
+      why: `성과 이름 한자의 획수를 더해 초년·청년·장년·말년 네 시기의 운을 봐요(81수리). 네 시기 수의 오행끼리 살려 주는지(수리오행)도 ${report.options.suriElement === 'strong' ? '25점 중 8점으로 중요하게' : '25점 중 3점으로 가볍게'}봐요.`,
       verdict: report.frames ? verdictOf(s.suri / 25) : 'ok',
       verdictText: report.frames ? VERDICT_TEXT[verdictOf(s.suri / 25)] : '한자 필요',
       pros,
@@ -727,8 +727,11 @@ function criterionSummary(c: Criterion, report: NameReport, a: SajuAnalysis | nu
       const h = report.soundBySchool.haerye.pairs.some((p) => p.kind === 'clash');
       const u = report.soundBySchool.unhae.pairs.some((p) => p.kind === 'clash');
       if (h && u) return '두 학설 모두 부딪히는 소리가 있어요';
-      if (h) return '해례본으로 보면 부딪히는 소리가 있어요';
-      if (u) return '해례본으로는 잘 어울려요 (운해본은 부딪힘)';
+      const mine = report.options.soundSchool === 'unhae' ? '운해본' : '해례본';
+      const other = mine === '해례본' ? '운해본' : '해례본';
+      const mineClash = mine === '해례본' ? h : u;
+      if (mineClash) return `${mine}으로 보면 부딪히는 소리가 있어요 (${other}은 잘 어울림)`;
+      if (h || u) return `${mine}으로는 잘 어울려요 (${other}은 부딪힘)`;
       return c.verdict === 'good' ? '두 학설 모두 소리가 잘 어울려요' : '소리 흐름이 무난해요';
     }
     case 'suri': {

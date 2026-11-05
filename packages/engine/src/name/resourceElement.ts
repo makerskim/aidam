@@ -76,3 +76,13 @@ export function resourceElementOf(ch: string, radical: number, meaning: string, 
   const el = suriElementOfStrokes(strokes);
   return { element: el, basis: `${ch}의 원획 ${strokes}획 끝자리로 추정`, confidence: 'C' };
 }
+
+/** 뜻 우선: 훈(뜻) 낱말로 먼저 정하고, 없으면 부수로 정한다(일부 작명 앱 방식) */
+export function resourceElementByMeaning(ch: string, radical: number, meaning: string, strokes: number): ResourceElement {
+  for (const w of meaningWords(meaning)) {
+    for (const [el, kws] of Object.entries(KEYWORDS) as [Element, string[]][]) {
+      if (kws.includes(w)) return { element: el, basis: `뜻 '${w}'`, confidence: 'B' };
+    }
+  }
+  return resourceElementOf(ch, radical, meaning, strokes);
+}

@@ -2,11 +2,11 @@ import { ELEMENT_HANJA, ELEMENT_KO, relation, type Element } from '../core/eleme
 import { isHangulSyllable } from '../hangul/jamo';
 import { applyDueum } from '../hangul/dueum';
 import { pronounce } from '../hangul/pronounce';
-import { ROLE_KO, type SajuAnalysis } from '../saju/analysis';
+import { ROLE_KO, sajuForMethod, type SajuAnalysis, type YongsinMethod } from '../saju/analysis';
 import { combineScore, type ScoreBreakdown } from '../score/score';
 import { analysisCode } from '../share/hash';
 import { DATA_VERSION, ENGINE_VERSION } from '../version';
-import { getHanja, isNameHanja, type HanjaEntry } from './hanjaDb';
+import { entryForBasis, getHanja, isNameHanja, type HanjaEntry } from './hanjaDb';
 import { FLOW_KO, SCHOOL_KO, soundElement, soundFlow, vowelYinYang, type SoundFlow, type SoundSchool } from './sound';
 import { FRAME_KO, fourFrames, strokeYinYang, suriElement, type FourFrames } from './suri';
 import { LUCK_KO, suri81, type SuriInfo } from './suri81';
@@ -37,6 +37,12 @@ export interface SchoolOptions {
   includeFinalConsonant: boolean;
   /** 해례본·운해본 두 학설 모두에서 음령오행 상극이 없는 이름만 추천 */
   bothSchoolsNoClash?: boolean;
+  /** 용신 정하는 법: 억부·조후(기본) / 부족한 오행 */
+  yongsinMethod?: YongsinMethod;
+  /** 수리오행(4격 오행의 상생) 비중: light 3점(기본) / strong 8점 */
+  suriElement?: 'light' | 'strong';
+  /** 한자(자원)오행: 부수 우선(기본) / 뜻 우선 */
+  hanjaElement?: 'radical' | 'meaning';
 }
 
 export const DEFAULT_SCHOOL_OPTIONS: SchoolOptions = {
@@ -135,6 +141,9 @@ export function suriPointsFor(
   const strongHits: (keyof FourFrames)[] = [];
   let points = 0;
   let noBad = true;
+  // 수리오행 비중: 기본 3점(길흉 22점), 수리오행 중시 8점(길흉 17점)
+  const flowWeight = options.suriElement === 'strong' ? 8 : 3;
+  const luckScale = (25 - flowWeight) / 22;
   for (const key of ['won', 'hyeong', 'i', 'jeong'] as const) {
     const n = frames[key];
     const info = suri81(n);
@@ -146,7 +155,7 @@ export function suriPointsFor(
     // 외자 이름의 이격은 성 획수만으로 정해져 이름으로 바꿀 수 없으므로 엄격 기준에서 뺀다
     const fixedBySurname = strokes.length === 1 && key === 'i';
     if (info.luck === 'bad' && !fixedBySurname) noBad = false;
-    points += FRAME_WEIGHTS[key] * value;
+    points += FRAME_WEIGHTS[key] * value * luckScale;
     results.push({ key, n, info, value, element: suriElement(n) });
   }
   let flow = 0;
@@ -154,7 +163,7 @@ export function suriPointsFor(
     const rel = relation((results[i] as FrameResult).element, (results[i + 1] as FrameResult).element);
     flow += rel === 'generates' || rel === 'generatedBy' ? 1 : rel === 'same' ? 0.5 : 0;
   }
-  points += (flow / 3) * 3;
+  points += (flow / 3) * flowWeight;
   return { frames, results, points, noBad, strongHits };
 }
 
@@ -181,15 +190,19 @@ function validate(input: NameInput) {
 
 export function analyzeName(
   input: NameInput,
-  saju: SajuAnalysis | null,
+  sajuIn: SajuAnalysis | null,
   options: SchoolOptions = DEFAULT_SCHOOL_OPTIONS,
   preference = 1,
 ): NameReport {
   validate(input);
+  const saju = sajuForMethod(sajuIn, options.yongsinMethod);
   const warnings: string[] = [];
   const reasons: Reason[] = [];
   const surnameChars = input.surname.map((c) => resolve(c, warnings, false));
-  const chars = input.given.map((c, i) => resolve(c, warnings, i === 0));
+  const chars = input.given.map((c, i) => {
+    const h = resolve(c, warnings, i === 0);
+    return h ? entryForBasis(h, options.hanjaElement) : null;
+  });
   const syllables = [...input.surname, ...input.given].map((c) => c.hangul);
   const fullHangul = syllables.join('');
   const allHanja = [...input.surname, ...input.given].every((c) => c.hanja);

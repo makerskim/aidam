@@ -10,6 +10,7 @@ import { useGate } from '../lib/gate';
 import { readSession, useSessionState, writeSession } from '../lib/session';
 import { SajuPanel } from '../components/report';
 import { HarmonyView } from '../components/harmony';
+import { BasisPicker } from '../components/basis';
 import { Disclaimer, ErrorText, Icon, Segmented, Staged } from '../components/ui';
 
 const PAGE = 30;
@@ -328,6 +329,8 @@ export function Results() {
           조건 바꾸기
         </Link>
       </header>
+
+      <BasisPicker school={state.school} onChange={(school) => navigate(`/results?${toQuery({ ...state, school })}`, { replace: true })} />
 
       {error ? <ErrorText>{error}</ErrorText> : null}
       {!error ? (

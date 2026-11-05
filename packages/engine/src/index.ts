@@ -9,8 +9,8 @@ export {
   type BirthInput, type SajuOptions, type Pillars, type PillarsResult, type LocalTime,
 } from './saju/pillars';
 export {
-  analyzePillars, STRENGTH_KO, ROLE_KO, GROUP_KO,
-  type SajuAnalysis, type StrengthLevel, type Role, type TenGodGroup,
+  analyzePillars, STRENGTH_KO, ROLE_KO, GROUP_KO, lackingMethod, sajuForMethod,
+  type SajuAnalysis, type StrengthLevel, type Role, type TenGodGroup, type YongsinMethod,
 } from './saju/analysis';
 export { computeSaju, type SajuResult, type SajuAlternative } from './saju';
 export { HIDDEN_STEMS } from './saju/hiddenStems';

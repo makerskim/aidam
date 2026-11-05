@@ -34,7 +34,12 @@ export interface SajuAnalysis {
   /** 이름 오행 선호도 (−1..1) */
   favor: Record<Element, number>;
   reasoning: string[];
+  /** 용신을 정한 방법: 억부·조후(기본) / 부족한 오행 */
+  method?: YongsinMethod;
 }
+
+/** 용신 정하는 법. eokbu: 억부·조후(사주 힘의 강약과 계절), lacking: 사주 여덟 글자에서 적은 오행을 채움(많은 작명 앱) */
+export type YongsinMethod = 'eokbu' | 'lacking';
 
 const W = { yearStem: 10, monthStem: 10, hourStem: 10, yearBranch: 10, monthBranch: 30, dayBranch: 20, hourBranch: 10 };
 
@@ -216,4 +221,39 @@ export function withYongsin(a: SajuAnalysis, yong: Element, hui: Element, note: 
     favor,
     reasoning: [...a.reasoning, note],
   };
+}
+
+/**
+ * '부족한 오행' 방식: 사주 여덟 글자를 세어 가장 적은 오행을 용신, 다음으로 적은 오행을 희신,
+ * 가장 많은 오행을 기신, 다음으로 많은 오행을 구신으로 본다(같으면 세력이 약한 쪽을 적다고 본다).
+ */
+export function lackingMethod(a: SajuAnalysis): SajuAnalysis {
+  if (a.method === 'lacking') return a;
+  const order = [...ELEMENTS].sort((x, y) => a.counts[x] - a.counts[y] || a.power[x] - a.power[y] || ELEMENTS.indexOf(x) - ELEMENTS.indexOf(y));
+  const [yong, hui, han, gu, gi] = order as [Element, Element, Element, Element, Element];
+  const roles = { [yong]: 'yong', [hui]: 'hui', [han]: 'han', [gu]: 'gu', [gi]: 'gi' } as Record<Element, Role>;
+  const favor = emptyElementRecord();
+  favor[yong] = 1;
+  favor[hui] = 0.8;
+  favor[han] = 0.2;
+  favor[gu] = -0.5;
+  favor[gi] = -1;
+  return {
+    ...a,
+    roles,
+    yongsin: yong,
+    huisin: hui,
+    favor,
+    method: 'lacking',
+    reasoning: [
+      ...a.reasoning.slice(0, 1),
+      `부족한 오행 방식: 사주 여덟 글자를 세어 가장 적은 ${el(yong)}(${a.counts[yong]}개)을 용신, 다음으로 적은 ${el(hui)}(${a.counts[hui]}개)을 희신으로 봅니다. 가장 많은 ${el(gi)}(${a.counts[gi]}개)은 피합니다.`,
+    ],
+  };
+}
+
+/** 고른 용신 방법에 맞는 사주 풀이 */
+export function sajuForMethod(a: SajuAnalysis | null, method: YongsinMethod | undefined): SajuAnalysis | null {
+  if (!a) return null;
+  return method === 'lacking' ? lackingMethod(a) : a;
 }
