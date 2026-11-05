@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { NameReport, Recommendation, SajuResult, PillarsResult } from '@aidam/engine';
 import { ELEMENT_HANJA, ELEMENTS, type Element } from '@aidam/engine/src/core/elements';
 import { BRANCHES, STEMS, branchElement, stemElement, ZODIAC_KO } from '@aidam/engine/src/core/ganji';
-import { meaningFor } from '../lib/format';
+import { hanjaMeaning } from '../lib/format';
 import { explainCriteria, nameHighlights, nameNarrative, PLAIN, sajuBrief, sajuEval, sajuNarrative, sajuSummary, tidy, type Criterion, type SajuRow } from '../lib/insights';
 import { Rich } from './rich';
 import { useLibrary } from '../lib/library';
@@ -21,7 +21,7 @@ export function NameHero({ report }: { report: NameReport }) {
         <div key={i} className={`syl ${isSur ? 'surname' : ''}`}>
           <span className="syl-ko">{c.hangul}</span>
           <span className="syl-hanja">{c.hanja ?? '–'}</span>
-          {!isSur && h ? <span className="syl-meaning">{meaningFor(h.meaning, c.hangul)}</span> : null}
+          {!isSur && h ? <span className="syl-meaning">{hanjaMeaning(h, c.hangul)}</span> : null}
         </div>
       ))}
     </div>
@@ -253,7 +253,7 @@ function FixOptions({ c, report, better, cur, hasSaju, recommendTo }: { c: Crite
           </Link>
         ) : null}
         {alts.map((b) => {
-          const meaning = b.report.chars.map((h, i) => (h ? meaningFor(h.meaning, b.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
+          const meaning = b.report.chars.map((h, i) => (h ? hanjaMeaning(h, b.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
           return (
             <Link key={b.hanja} className="fix-opt" to={`/report?${altQuery(cur, b)}`} replace>
               <b>
@@ -454,9 +454,15 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
           {report.fullHangul}
           {report.fullHanja ? <span className="muted"> {report.fullHanja}</span> : null}, {GRADE_LINE[report.score.grade] ?? ''}
         </p>
-        <p className="summary-body">
-          <Rich text={tidy(nameNarrative(report, a))} />
-        </p>
+        <div className="summary-body">
+          {nameNarrative(report, a)
+            .split('\n')
+            .map((para) => (
+              <p key={para}>
+                <Rich text={tidy(para)} />
+              </p>
+            ))}
+        </div>
         <div className="hl">
           {hl.good.length ? (
             <div className="hl-col good">
@@ -533,7 +539,7 @@ export function ReportView({ report, saju, better, query }: { report: NameReport
 }
 
 function BetterRow({ rec, to }: { rec: Recommendation; to: string }) {
-  const meaning = rec.report.chars.map((h, i) => (h ? meaningFor(h.meaning, rec.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
+  const meaning = rec.report.chars.map((h, i) => (h ? hanjaMeaning(h, rec.report.input.given[i]?.hangul ?? '') : '')).filter(Boolean).join(' · ');
   return (
     <Link className="name-card nc-link solo" to={to} replace>
       <span className="nc-main">

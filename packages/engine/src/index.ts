@@ -37,3 +37,4 @@ export { analyzeSiblings, recommendSiblingSets, nameDistinctness, type ChildInpu
 export { encodeState, decodeState } from './share/state';
 export { fnv1a, analysisCode, stableStringify } from './share/hash';
 export { ENGINE_VERSION, DATA_VERSION } from './version';
+export { HANJA_STORY, type HanjaStory } from './name/stories';

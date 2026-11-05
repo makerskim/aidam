@@ -1395,6 +1395,37 @@ img {
   justify-content: space-between;
   gap: 8px 16px;
 }
+.res-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.res-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+.res-opt-label {
+  flex: 0 0 64px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-3);
+}
+.res-opt .choice {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.res-opt .choice .num {
+  margin-left: 2px;
+  opacity: 0.7;
+}
+.choice:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .res-filters .switch {
   min-height: 44px;
   gap: 12px;
@@ -1694,6 +1725,13 @@ img {
   font-size: 16px;
   line-height: 1.75;
   color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.summary-body p:last-child {
+  color: var(--ink);
+  font-weight: 700;
 }
 .disclaimer {
   text-align: center;

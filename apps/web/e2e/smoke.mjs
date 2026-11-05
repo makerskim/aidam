@@ -86,7 +86,17 @@ await page.click('button:has-text("이름 추천받기")');
 await page.waitForSelector('.name-card', { timeout: 40000 });
 assert.ok(await page.locator('.saju-panel').count(), '만세력이 먼저 보이지 않음');
 assert.equal(await page.locator('.name-card .chip').count(), 0, '목록 카드에 태그가 남아 있음');
-assert.ok((await page.locator('.name-card .grade-pill').allTextContents()).every((t) => t === 'S등급'), 'S등급이 아닌 추천이 있음');
+// 처음에는 고를 거리가 30개 이상 되도록 등급을 넓혀 보여 주고, 등급은 결과에서 고른다
+{
+  const allCount = Number((await page.locator('.res-opt button.choice:has-text("전체") .num').textContent()) ?? '0');
+  const cards = await page.locator('.name-card').count();
+  assert.ok(cards >= Math.min(30, allCount), `추천이 ${cards}개뿐 (전체 ${allCount})`);
+  await page.click('.res-opt button.choice:has-text("S등급")');
+  assert.ok((await page.locator('.name-card .grade-pill').allTextContents()).every((t) => t === 'S등급'), 'S등급만 골랐는데 다른 등급이 있음');
+  await page.click('.res-opt button.choice:has-text("전체")');
+  assert.equal(await page.locator('.name-card').count(), Math.min(30, allCount), '전체를 골랐는데 개수가 다름');
+  await page.click('.res-opt button.choice:has-text("S등급")');
+}
 assert.ok(/^\d+$/.test((await page.locator('.name-card .nc-score b').first().textContent()) ?? ''), '점수에 소수점');
 assert.equal((await page.locator('.name-card .rank').first().textContent())?.trim(), '1', '순위 표시');
 const listScore = (await page.locator('.name-card .nc-score b').first().textContent())?.trim();
@@ -100,6 +110,11 @@ assert.equal(await page.locator('.crit-row:not(.sub)').count(), 5, '항목 수')
 assert.ok(await page.locator('.report .saju-panel').count(), '리포트에 만세력 없음');
 assert.ok(await page.locator('.topbar >> text=한자 바꿔 보기').count(), '맨 위 한자 바꿔 보기 없음');
 assert.ok(await page.locator('.summary .hl-col').count(), '총평 없음');
+{
+  const body = (await page.locator('.summary-body').first().textContent()) ?? '';
+  assert.ok(/바라는|바람/.test(body), `총평에 이름의 바람이 없음: ${body.slice(0, 60)}`);
+  assert.ok(!/undefined|null|NaN/.test(body), `총평에 빈 값: ${body}`);
+}
 assert.equal(await page.locator('text=분석 코드').count(), 0);
 await page
   .waitForFunction((v) => document.querySelector('.big-score')?.textContent?.trim() === `${v}점`, listScore, { timeout: 5000 })
@@ -204,7 +219,12 @@ async function single(style, fixed) {
   return page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
 }
 const popularNames = await single('요즘 많이 쓰는');
+// 결과 화면에서 바로 이름 느낌 바꾸기
+await page.click('.res-opt button.choice:has-text("흔하지 않은")');
+await page.waitForFunction((first) => document.querySelector('.name-card .nc-name b:not(.hj)')?.textContent !== first, popularNames[0], { timeout: 40000 });
+const viaChip = await page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
 const uniqueNames = await single('흔하지 않은');
+assert.deepEqual(viaChip.slice(0, 10), uniqueNames.slice(0, 10), '결과에서 바꾼 이름 느낌과 처음부터 고른 결과가 다름');
 const balancedNames = await single('무난한');
 assert.notEqual(popularNames[0], uniqueNames[0], '이름 느낌을 바꿔도 첫 이름이 같음');
 assert.notEqual(popularNames[0], balancedNames[0], '요즘 많이 쓰는·무난한 첫 이름이 같음');

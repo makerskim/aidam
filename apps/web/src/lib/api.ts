@@ -70,7 +70,7 @@ export const api = {
       birth: state.birth ? { ...state.birth, time: k.time } : null,
     }));
     const sajus = children.map((c) => (c.birth ? computeSaju(c.birth, state.sajuOpts) : null));
-    const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 10);
+    const sets = recommendSiblingSets(surnameChars(state.surname), children, state.prefs, state.sajuOpts, state.school, 20);
     const sameSaju = sajus.length > 1 && sajus.every((s) => s && JSON.stringify(s.base.pillars) === JSON.stringify(sajus[0]?.base.pillars));
     return { sajus, sets, sameSaju };
   },

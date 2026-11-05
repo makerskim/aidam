@@ -25,7 +25,7 @@ describe('이름 분석·채점', () => {
     expect(report.score.total).toBeLessThanOrEqual(100);
     expect(['S', 'A', 'B', 'C', 'D']).toContain(report.score.grade);
     expect(report.analysisCode).toMatch(/^[0-9A-F]{8}$/);
-    expect(report.engineVersion).toBe('1.3.0');
+    expect(report.engineVersion).toBe('1.4.0');
     expect(report.score.partial).toBe(false);
   });
   it('배점 상한: 자원30 수리25 음령20 음양10 실용15', () => {

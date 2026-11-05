@@ -7,6 +7,7 @@ import {
 } from '../name/analyze';
 import { getHanja, hanjaByReading, isNameHanja, type HanjaEntry } from '../name/hanjaDb';
 import { isPositiveMeaning, teaseWord } from '../name/safety';
+import { HANJA_STORY } from '../name/stories';
 import { soundFlow, vowelYinYang } from '../name/sound';
 import { strokeYinYang } from '../name/suri';
 import type { SajuAnalysis } from '../saju/analysis';
@@ -137,6 +138,8 @@ function allowedAt(level: Level, weights: number[], hangul: string, known: Set<s
 const GRADE_RANK: Record<string, number> = { S: 4, A: 3, B: 2, C: 1, D: 0 };
 /** 느낌에 맞는 이름만으로 이만큼 S등급이 나오면 다른 느낌 이름은 섞지 않는다 */
 const STYLE_TARGET = 8;
+/** 고를 거리가 되도록 적어도 이만큼은 보여 준다(limit보다 크면 limit) */
+const MIN_TOTAL = 30;
 
 interface HangulCandidate {
   syllables: string[];
@@ -157,12 +160,16 @@ function primaryReadingMatches(h: HanjaEntry, syllable: string, initial: boolean
 }
 
 function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis | null, options: SchoolOptions): HanjaEntry[] {
-  const list = hanjaByReading(syllable, { initial: position === 0 }).filter(
+  const base = hanjaByReading(syllable, { initial: position === 0 }).filter(
     (h) =>
       isNameHanja(h) && !h.negative && h.meaning !== '' && !(options.excludeBulyong && h.bulyong) &&
       primaryReadingMatches(h, syllable, position === 0) &&
       (FAMILIAR_HANJA.has(h.ch) || isPositiveMeaning(h.meaning)),
   );
+  // 이름에 어울리는지 사람이 확인하고 뜻 이야기를 써 둔 한자(HANJA_STORY)가 있으면 그 안에서만 고른다.
+  // 점수만 보고 '수갑 추(杻)'처럼 이름에 쓰지 않는 글자가 끼는 것을 막는다.
+  const storied = base.filter((h) => HANJA_STORY.has(h.ch));
+  const list = storied.length > 0 ? storied : base;
   const key = (h: HanjaEntry) =>
     (FAMILIAR_HANJA.has(h.ch) ? 2 : 0) + (isPositiveMeaning(h.meaning) ? 1 : 0) + (h.edu ? 0.3 : 0) +
     (saju ? saju.favor[h.element] * (h.elementConfidence === 'C' ? 0.5 : 1) : 0);
@@ -238,10 +245,11 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     const all = [...surSyl, ...syl];
     if (teaseWord(all.join(''))) continue;
     const flow = soundFlow(all, options.soundSchool, options.includeFinalConsonant);
-    let clash = flow.pairs.some((p) => p.kind === 'clash');
+    const clash = flow.pairs.some((p) => p.kind === 'clash');
+    // '두 학설 모두 상극 없음'은 사용자가 켠 조건이라 어느 단계에서도 지킨다
     if (options.bothSchoolsNoClash) {
       const other = options.soundSchool === 'haerye' ? 'unhae' : 'haerye';
-      clash = clash || soundFlow(all, other, options.includeFinalConsonant).pairs.some((p) => p.kind === 'clash');
+      if (clash || soundFlow(all, other, options.includeFinalConsonant).pairs.some((p) => p.kind === 'clash')) continue;
     }
     const vowel = vowelYinYang(all);
     const pronChanged = pronounce(all).join('') !== all.join('');
@@ -353,18 +361,22 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   };
 
   const sCount = (rs: Out[]) => new Set(rs.filter((r) => r.report.score.grade === 'S').map((r) => r.hangul)).size;
-  const topRank = (rs: Out[]) => (rs.length ? Math.max(...rs.map((r) => GRADE_RANK[r.report.score.grade] ?? 0)) : -1);
-  let best: Out[] = [];
+  const enough = Math.min(MIN_TOTAL, limit);
+  let last: Out[] = [];
   for (const level of [0, 1, 2, 3] as const) {
     const { out, size } = run(level);
+    last = out;
+    if (out.length < enough) continue;
     if (level === 0 && sCount(out) >= STYLE_TARGET) return strip(out);
     // 돌림자 등으로 실제 이름 후보가 너무 적으면(40개 미만) 흔한 음절 조합까지 본다
     if (level >= 1 && sCount(out) > 0 && (level >= 2 || size >= 40)) return strip(out);
-    if (topRank(out) > topRank(best)) best = out;
   }
-  // 조건을 다 지키는 이름이 하나도 없을 때만 '아쉬운 이름 미리 빼기'를 풀고 가장 나은 이름을 보여 준다
-  if (best.length === 0 && options.strictMode) best = run(4).out;
-  return strip(best);
+  // 넓혀도 모자라면 '아쉬운 이름 미리 빼기'를 풀어 찾은 이름을 뒤에 붙인다(조건을 지킨 이름이 먼저)
+  if (last.length < enough && options.strictMode) {
+    const seen = new Set(last.map((r) => r.hanja));
+    last = [...last, ...run(4).out.filter((r) => !seen.has(r.hanja))].slice(0, limit);
+  }
+  return strip(last);
 }
 
 function strip(rs: (Recommendation & { pref: number; tier: number })[]): Recommendation[] {

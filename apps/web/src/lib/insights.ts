@@ -2,7 +2,8 @@ import type { NameReport, SajuAnalysis, SajuResult } from '@aidam/engine';
 import { ELEMENT_HANJA, type Element } from '@aidam/engine/src/core/elements';
 import { FRAME_KO } from '@aidam/engine/src/name/suri';
 import { SCHOOL_KO } from '@aidam/engine/src/name/sound';
-import { meaningFor } from './format';
+import { HANJA_STORY } from '@aidam/engine/src/name/stories';
+import { hanjaMeaning } from './format';
 
 const WORD: Record<Element, string> = { wood: '나무', fire: '불', earth: '흙', metal: '쇠', water: '물' };
 const el = (e: Element) => `${WORD[e]}(${ELEMENT_HANJA[e]})`;
@@ -38,7 +39,7 @@ export function insights(report: NameReport, saju: SajuAnalysis | null): Insight
       const role = saju.roles[r.element];
       const h = report.chars.find((c) => c?.ch === r.ch);
       const syl = given[report.chars.indexOf(h ?? null)]?.hangul ?? '';
-      const m = h ? meaningFor(h.meaning, syl) : '';
+      const m = h ? hanjaMeaning(h, syl) : '';
       if (role === 'yong') complement.push(`${r.ch}(${m})의 ${el(r.element)} 기운이 사주에 가장 필요한 용신을 채워요.`);
       else if (role === 'hui') complement.push(`${r.ch}(${m})의 ${el(r.element)} 기운이 용신을 돕는 희신이에요.`);
       else if (role === 'gi') caution.push(`${r.ch}의 ${el(r.element)} 기운은 사주와 맞지 않아요(기신).`);
@@ -81,7 +82,7 @@ export function insights(report: NameReport, saju: SajuAnalysis | null): Insight
 
   // 뜻·어감
   const meanings = report.chars
-    .map((h, i) => (h && !h.negative ? `${h.ch} ${meaningFor(h.meaning, given[i]?.hangul ?? '')}` : null))
+    .map((h, i) => (h && !h.negative ? `${h.ch} ${hanjaMeaning(h, given[i]?.hangul ?? '')}` : null))
     .filter(Boolean);
   if (meanings.length && meanings.length === report.chars.length) good.push(`뜻이 좋아요: ${meanings.join(', ')}.`);
   for (const h of report.chars) if (h?.negative) caution.push(`${h.ch}(${h.meaning.split(',')[0]})는 이름에 피하는 뜻이에요.`);
@@ -222,50 +223,254 @@ const josa = (word: string, a: string, b: string) => {
 /** 문장 끝 두 낱말을 붙여, 마지막 줄에 한두 글자만 떨어지지 않게 한다 */
 export const tidy = (text: string): string => text.replace(/ (\S+)$/, '\u00a0$1');
 
+/**
+ * 미리 써 둔 문장 조각을 이름마다 골라 잇는다.
+ * 같은 이름(같은 사주)이면 언제나 같은 글, 이름이 다르면 문장도 달라진다(난수 없음).
+ */
+function seedOf(text: string): number {
+  let h = 2166136261;
+  for (const c of text) {
+    h ^= c.codePointAt(0) ?? 0;
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function pick<T>(options: readonly T[], seed: number, salt: number): T {
+  const i = (Math.imul((seed ^ Math.imul(salt, 0x9e3779b1)) >>> 0, 2654435761) >>> 0) % options.length;
+  return options[i] as T;
+}
+/** 괄호 앞 낱말의 받침으로 조사 고르기: 예의(禮)를, 마음(仁)을 */
+const josaText = (text: string, withFinal: string, without: string) => josa(text.replace(/\([^()]*\)$/, '').trim(), withFinal, without);
+
 /** 사주 풀이 (2~3문장) */
 export function sajuNarrative(a: SajuAnalysis): string {
   const img = DAY_MASTER_IMAGE[a.pillars.day.stem] ?? '';
+  const stem = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'][a.pillars.day.stem] ?? '';
   const season = SEASON(a.pillars.month.branch);
+  const seed = seedOf(JSON.stringify(a.pillars));
   const strong = ORDER.filter((e) => a.power[e] >= 30);
   const lacking = ORDER.filter((e) => a.counts[e] === 0 || a.power[e] < 10);
+  const need = el(a.yongsin);
   const parts: string[] = [];
-  parts.push(`${season}에 태어난 ${img}(${['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'][a.pillars.day.stem]}${ELEMENT_HANJA[a.dayMaster]}) 같은 아이예요.`);
+  const me = `${img}(${stem}${ELEMENT_HANJA[a.dayMaster]})`;
+  parts.push(
+    pick(
+      [
+        `${season}에 태어난 ${me} 같은 아이예요.`,
+        `${me}의 기운을 품고 ${season}에 태어난 아이예요.`,
+        `타고난 바탕은 ${season}의 ${me}${josa(img, '이에요', '예요')}.`,
+      ],
+      seed,
+      1,
+    ),
+  );
   if (a.strength.level === 'strong' || a.strength.level === 'veryStrong') {
-    parts.push(`${strong.length ? `${strong.map((e) => WORD[e]).join('·')} 기운이 넉넉해 ` : ''}스스로 힘이 센 사주라, 그 힘을 잘 쓰게 이끌어 줄 ${el(a.yongsin)} 기운이 필요해요.`);
+    const many = strong.length ? `${strong.map((e) => WORD[e]).join('·')} 기운이 넉넉해 ` : '';
+    parts.push(
+      pick(
+        [
+          `${many}스스로 힘이 센 사주라, 그 힘을 잘 쓰게 이끌어 줄 ${need} 기운이 필요해요.`,
+          `${many}타고난 힘이 넘치는 편이에요. 그 힘이 한쪽으로 쏠리지 않게 ${need} 기운으로 물꼬를 터 주면 좋아요.`,
+        ],
+        seed,
+        2,
+      ),
+    );
   } else if (a.strength.level === 'weak' || a.strength.level === 'veryWeak') {
-    parts.push(`둘레의 기운에 비해 타고난 힘이 여린 편이라, 곁에서 받쳐 줄 ${el(a.yongsin)} 기운이 큰 힘이 돼요.`);
+    parts.push(
+      pick(
+        [
+          `둘레의 기운에 비해 타고난 힘이 여린 편이라, 곁에서 받쳐 줄 ${need} 기운이 큰 힘이 돼요.`,
+          `여린 새싹처럼 타고난 힘이 아직 작은 편이에요. ${need} 기운이 곁에서 받쳐 주면 단단하게 자라요.`,
+        ],
+        seed,
+        2,
+      ),
+    );
   } else {
-    parts.push(`기운이 고르게 잡힌 사주라, ${lacking.length ? `조금 모자란 ${lacking.map((e) => WORD[e]).join('·')}을 채워 ` : ''}균형을 지켜 주면 좋아요.`);
+    const few = lacking.length ? `조금 모자란 ${lacking.map((e) => WORD[e]).join('·')}${josa(WORD[lacking[lacking.length - 1] as Element], '을', '를')} 채워 ` : '';
+    parts.push(
+      pick(
+        [`기운이 고르게 잡힌 사주라, ${few}균형을 지켜 주면 좋아요.`, `다섯 기운이 비교적 고르게 놓인 사주예요. ${few}지금의 균형을 지켜 주는 이름이 잘 맞아요.`],
+        seed,
+        2,
+      ),
+    );
   }
-  parts.push(`${WORD[a.yongsin]}${josa(WORD[a.yongsin], '은', '는')} ${VIRTUE[a.yongsin]}을 뜻해요. 이름에 이 기운을 담아 아이의 삶에 균형을 더해 주세요.`);
+  const virtue = VIRTUE[a.yongsin];
+  const w = WORD[a.yongsin];
+  parts.push(
+    pick(
+      [
+        `${w}${josa(w, '은', '는')} ${virtue}${josaText(virtue, '을', '를')} 뜻해요. 이름에 이 기운을 담아 아이의 삶에 균형을 더해 주세요.`,
+        `${w} 기운은 ${virtue}${josaText(virtue, '과', '와')} 이어져요. 이 기운을 이름에 담으면 아이가 자라는 내내 그 힘을 곁에 두게 돼요.`,
+        `이름에 ${w} 기운을 담으면 ${virtue}${josaText(virtue, '이', '가')} 아이 곁에 오래 머물러요.`,
+      ],
+      seed,
+      3,
+    ),
+  );
   return tidy(parts.join(' '));
 }
 
-/** 이 이름을 추천하는 까닭 (작명가의 한마디) */
+/**
+ * 총평: 한자마다 미리 써 둔 뜻 이야기(HANJA_STORY)를 이어 이름의 바람을 풀어 쓰고,
+ * 사주·획수·소리를 덧붙인 뒤 맺음말로 끝낸다. 문단은 줄바꿈(\n)으로 나눈다.
+ */
 export function nameNarrative(report: NameReport, a: SajuAnalysis | null): string {
   const given = report.input.given;
+  const name = given.map((g) => g.hangul).join('');
+  const full = report.input.surname.map((c) => c.hangul).join('') + name;
+  const seed = seedOf(`${report.fullHanja ?? ''}|${full}`);
   const parts: string[] = [];
-  const words = report.chars
-    .map((h, i) => (h ? meaningFor(h.meaning, given[i]?.hangul ?? '').split(/\s+/).slice(0, -1).join(' ') : null))
-    .filter((w): w is string => Boolean(w));
-  if (words.length && report.fullHanja) {
-    parts.push(`${report.fullHanja.slice(report.input.surname.length)}에는 ‘${words.join('’, ‘')}’의 뜻이 담겨 있어요.`);
+
+  // 1) 뜻: 글자마다의 바람 → 두 글자를 합친 뜻
+  const chars = report.chars.map((h, i) => {
+    if (!h) return null;
+    const reading = given[i]?.hangul ?? '';
+    return { label: `${h.ch}(${hanjaMeaning(h, reading)})`, reading, story: HANJA_STORY.get(h.ch) };
+  });
+  const storied = chars.filter((c): c is { label: string; reading: string; story: NonNullable<ReturnType<typeof HANJA_STORY.get>> } => Boolean(c?.story));
+  if (storied.length === chars.length && storied.length === 1) {
+    const x = storied[0]!;
+    parts.push(pick([`${x.label}에는 ${x.story.wish} 바라는 마음이 담겼어요.`, `${x.label}${josa(x.reading, '은', '는')} ${x.story.wish} 바라는 글자예요.`], seed, 1));
+    parts.push(pick([`한 글자에 ‘${x.story.adj} 아이’라는 뜻을 오롯이 담은 이름이에요.`, `짧지만 ‘${x.story.adj} 아이’라는 바람이 또렷한 이름이에요.`], seed, 2));
+  } else if (storied.length === chars.length && storied.length >= 2) {
+    const x = storied[0]!;
+    const y = storied[storied.length - 1]!;
+    parts.push(
+      pick(
+        [
+          `${x.label}에는 ${x.story.wish}, ${y.label}에는 ${y.story.wish} 바라는 마음이 담겼어요.`,
+          `${x.label}에 ${x.story.wish}, ${y.label}에 ${y.story.wish} 바라는 뜻을 함께 담았어요.`,
+          `${x.label}${josa(x.reading, '은', '는')} ${x.story.wish} 바라는 글자이고, ${y.label}${josa(y.reading, '은', '는')} ${y.story.wish} 바라는 글자예요.`,
+        ],
+        seed,
+        1,
+      ),
+    );
+    // 두 꾸밈말이 같은 낱말을 되풀이하면(터전이 든든하고 바탕이 든든한) 합친 뜻 대신 다른 문장을 쓴다
+    const stems = (t: string) => t.split(/\s+/).map((w) => (w.length <= 2 ? w.slice(0, 1) : w.slice(0, 2)));
+    const overlap = x.story.adj !== y.story.adj && stems(x.story.and).some((w) => stems(y.story.adj).includes(w));
+    const phrase = x.story.adj === y.story.adj ? `더없이 ${y.story.adj}` : `${x.story.and} ${y.story.adj}`;
+    parts.push(
+      overlap
+        ? pick(['두 글자의 바람이 한 이름 안에서 서로를 북돋아 줘요.', '두 글자의 뜻이 한 방향을 바라보고 있어, 바람이 더 또렷해요.'], seed, 2)
+        : pick(
+            [
+              `두 글자를 함께 부르면 ‘${phrase} 아이’라는 뜻이 돼요.`,
+              `그래서 ${name}${josa(name, '이라는', '라는')} 이름은 ‘${phrase} 아이’로 자라라는 바람을 품고 있어요.`,
+              `이름 전체로 보면 ‘${phrase} 사람’이 되라는 뜻이에요.`,
+            ],
+            seed,
+            2,
+          ),
+    );
+  } else {
+    const words = report.chars
+      .map((h, i) => (h ? hanjaMeaning(h, given[i]?.hangul ?? '').split(/\s+/).slice(0, -1).join(' ') : null))
+      .filter((w): w is string => Boolean(w));
+    if (words.length && report.fullHanja) parts.push(`${report.fullHanja.slice(report.input.surname.length)}에는 ‘${words.join('’, ‘')}’의 뜻이 담겨 있어요.`);
   }
+
+  // 문단을 나눈다: 뜻 / 사주·획수·소리 / 맺음말
+  const meaningEnd = parts.length;
+  // 2) 사주: 이름이 모자란 기운을 채우는지
   if (a) {
+    const need = el(a.yongsin);
     const good = report.resource.filter((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui');
     const bad = report.resource.filter((r) => a.roles[r.element] === 'gi');
-    if (good.length) parts.push(`${good.map((r) => r.ch).join('·')}의 ${[...new Set(good.map((r) => el(r.element)))].join('·')} 기운이 사주에 필요한 자리를 채워 줘요. 이 아이에게 모자란 ${el(a.yongsin)} 기운을 이름이 평생 곁에서 보태 주는 셈이에요.`);
-    else if (bad.length) parts.push(`다만 ${bad.map((r) => r.ch).join('·')}의 기운은 사주와 부딪혀요. 같은 소리의 다른 한자를 함께 살펴보세요.`);
-    else parts.push(`이 아이에게 필요한 ${el(a.yongsin)} 기운을 가진 한자로 바꾸면 사주를 더 잘 채울 수 있어요.`);
+    if (good.length) {
+      const ch = good.map((r) => r.ch).join('·');
+      const els = [...new Set(good.map((r) => el(r.element)))].join('·');
+      parts.push(
+        pick(
+          [
+            `이 아이에게 가장 필요한 기운은 ${need}${pj(a.yongsin, '이에요', '예요')}. ${ch}의 ${els} 기운이 바로 그 빈자리를 채워 줘요.`,
+            `${ch}의 ${els} 기운이 사주에 모자란 자리를 채워 줘요. 이름이 평생 곁에서 부족한 기운을 보태 주는 셈이에요.`,
+            `${ch}에 담긴 ${els} 기운은 이 아이의 사주와 손발이 잘 맞아요. 부를수록 모자란 기운이 채워지는 이름이에요.`,
+          ],
+          seed,
+          3,
+        ),
+      );
+    } else if (bad.length) {
+      const ch = bad.map((r) => r.ch).join('·');
+      const els = [...new Set(bad.map((r) => el(r.element)))].join('·');
+      parts.push(
+        pick(
+          [
+            `다만 ${ch}의 ${els} 기운은 이 아이의 사주와 잘 맞지 않아요. 같은 소리의 다른 한자도 함께 살펴보세요.`,
+            `아쉬운 점은 ${ch}의 ${els} 기운이 사주와 부딪힌다는 거예요. 같은 소리의 다른 한자로 바꿔 볼 만해요.`,
+          ],
+          seed,
+          3,
+        ),
+      );
+    } else {
+      parts.push(pick([`사주에 필요한 ${need} 기운을 가진 한자로 바꾸면 사주를 더 잘 채울 수 있어요.`, `이름 한자에 ${need} 기운이 들어가면 사주의 균형이 더 좋아져요.`], seed, 3));
+    }
   }
+
+  // 3) 획수
   if (report.frames) {
     const badF = report.frameResults.filter((f) => f.info.luck === 'bad');
-    parts.push(badF.length ? `획수로 본 운에서는 ${badF.map((f) => FRAME_KO[f.key].period).join('·')}이 아쉬워요.` : '획수로 본 초년부터 말년까지의 운도 모두 좋은 수로 이어져요.');
+    const periods = badF.map((f) => FRAME_KO[f.key].period).join('·');
+    parts.push(
+      badF.length
+        ? pick([`획수로 본 운에서는 ${periods}이 아쉬워요.`, `획수를 따져 보면 ${periods}의 수가 아쉬운 편이에요.`], seed, 4)
+        : pick(
+            [
+              '획수로 본 초년부터 말년까지의 운도 모두 좋은 수로 이어져요.',
+              '획수를 따져 보면 어린 시절부터 노년까지 네 시기의 운이 모두 좋은 수예요.',
+              '획수 풀이에서도 평생의 네 시기가 모두 좋은 수로 나와 든든해요.',
+            ],
+            seed,
+            4,
+          ),
+    );
   }
+
+  // 4) 소리
   const flow = report.soundBySchool[report.options.soundSchool];
-  if (flow.pairs.length) parts.push(flow.pairs.some((p) => p.kind === 'clash') ? '부를 때 소리의 흐름에 부딪히는 곳이 한 군데 있어요.' : '성부터 이름까지 부르는 소리의 기운이 서로 살려 주며 자연스럽게 이어져요.');
-  if (report.strokeYinYang?.balanced && report.vowel.level !== 'unbalanced') parts.push('획수의 홀짝과 모음의 밝고 어두움도 고르게 섞여 균형이 맞아요.');
-  return parts.join(' ');
+  if (flow.pairs.length) {
+    parts.push(
+      flow.pairs.some((p) => p.kind === 'clash')
+        ? pick(['부를 때 소리의 흐름에 부딪히는 곳이 한 군데 있어요.', '소리 기운이 한 번 부딪히는 곳이 있어, 부를 때 살짝 걸려요.'], seed, 5)
+        : pick(
+            [
+              '성부터 이름까지 부르는 소리의 기운이 서로 살려 주며 자연스럽게 이어져요.',
+              `소리 내어 ‘${full}’ 하고 불러 보면 첫소리 기운이 차례로 이어져 입에 잘 붙어요.`,
+              '부르는 소리도 성에서 이름으로 기운을 살려 주며 흘러, 듣기에 편안해요.',
+            ],
+            seed,
+            5,
+          ),
+    );
+  }
+  if (report.strokeYinYang?.balanced && report.vowel.level !== 'unbalanced') {
+    parts.push(pick(['획수의 홀짝과 모음의 밝고 어두움도 고르게 섞여 균형이 맞아요.', '획수와 모음의 음양도 한쪽으로 치우치지 않아 균형이 맞아요.'], seed, 6));
+  }
+
+  // 5) 맺음말
+  const g = report.score.grade;
+  parts.push(
+    g === 'S' || g === 'A'
+      ? pick(
+          [
+            `‘${full}’${josa(full, '이라고', '라고')} 부를 때마다 이 바람이 아이에게 닿기를 바라요.`,
+            '오래 불러도 질리지 않고, 부를수록 좋은 뜻이 더해지는 이름이에요.',
+            '불릴 때마다 좋은 기운이 차곡차곡 쌓이는 이름이에요.',
+          ],
+          seed,
+          7,
+        )
+      : g === 'B'
+        ? '전체로 보면 무난한 이름이에요. 아쉬운 점은 아래 항목에서 고쳐 볼 수 있어요.'
+        : '아쉬운 점이 있는 이름이에요. 아래 항목에서 무엇이 아쉬운지 보고 고쳐 볼 수 있어요.',
+  );
+  const closing = parts.pop() as string;
+  return [parts.slice(0, meaningEnd).join(' '), parts.slice(meaningEnd).join(' '), closing].filter(Boolean).join('\n');
 }
 
 // ── 쉬운 말 풀이: 기준마다 "무엇이 있어서/없어서 좋은지, 왜 아쉬운지" ─────────
@@ -335,7 +540,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       report.resource.forEach((r) => {
         const h = report.chars.find((c) => c?.ch === r.ch);
         const syl = given[report.chars.indexOf(h ?? null)]?.hangul ?? '';
-        const m = h ? meaningFor(h.meaning, syl) : '';
+        const m = h ? hanjaMeaning(h, syl) : '';
         const role = a.roles[r.element];
         const basis = r.confidence === 'C' ? '' : ` ${r.basis.replace('부수 ', '').replace(' (성명학 통설)', '')} 부수라`;
         if (role === 'yong' || role === 'hui') pros.push(`${r.ch}(${m})는${basis} ${plain(r.element)} 기운을 가진 한자예요. 이 아이에게 필요한 ${plain(r.element)}${pj(r.element, '을', '를')} 채워 줘요.`);
@@ -458,7 +663,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
     const cons: string[] = [];
     report.chars.forEach((h, i) => {
       if (!h) return;
-      const m = meaningFor(h.meaning, given[i]?.hangul ?? '');
+      const m = hanjaMeaning(h, given[i]?.hangul ?? '');
       if (h.negative) cons.push(`${h.ch}(${m})는 이름에 피하는 뜻이에요.`);
       else pros.push(`${h.ch}: ‘${m}’`);
     });
