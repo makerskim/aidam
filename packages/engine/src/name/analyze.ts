@@ -111,7 +111,8 @@ export function resourcePointsFor(entries: readonly HanjaEntry[], saju: SajuAnal
       fsum += w * saju.favor[h.element];
     }
     const avg = fsum / wsum;
-    return Math.min(30, ((avg + 1) / 2) * 28 + (entries.some((h) => h.element === saju.yongsin) ? 2 : 0));
+    const fillsMissing = entries.some((h) => saju.counts[h.element] === 0 && saju.roles[h.element] !== 'gi' && saju.roles[h.element] !== 'gu');
+    return Math.min(30, ((avg + 1) / 2) * 28 + (entries.some((h) => h.element === saju.yongsin) ? 2 : 0) + (fillsMissing ? 1 : 0));
   }
   if (entries.length === 1) return 20;
   let s = 0;

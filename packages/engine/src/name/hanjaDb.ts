@@ -82,6 +82,13 @@ export function hanjaByReading(syllable: string, opts: { initial?: boolean } = {
     for (const [reading, list] of byReading) {
       if (reading !== syllable && applyDueum(reading) === syllable) for (const h of list) found.add(h);
     }
+  } else {
+    // 이름 가운데·끝의 률·렬은 모음이나 ㄴ 뒤에서 율·열로 읽는다(서율 徐律, 하율 夏律)
+    const liquid = MID_LIQUID[syllable];
+    if (liquid) for (const h of byReading.get(liquid) ?? []) found.add(h);
   }
   return [...found].sort(byCodePoint);
 }
+
+/** 이름 둘째 글자 이후에 율·열로 읽는 률·렬 */
+export const MID_LIQUID: Readonly<Record<string, string>> = { 율: '률', 열: '렬' };

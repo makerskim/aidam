@@ -86,17 +86,9 @@ await page.click('button:has-text("이름 추천받기")');
 await page.waitForSelector('.name-card', { timeout: 40000 });
 assert.ok(await page.locator('.saju-panel').count(), '만세력이 먼저 보이지 않음');
 assert.equal(await page.locator('.name-card .chip').count(), 0, '목록 카드에 태그가 남아 있음');
-// 처음에는 고를 거리가 30개 이상 되도록 등급을 넓혀 보여 주고, 등급은 결과에서 고른다
-{
-  const allCount = Number((await page.locator('.res-opt button.choice:has-text("전체") .num').textContent()) ?? '0');
-  const cards = await page.locator('.name-card').count();
-  assert.ok(cards >= Math.min(30, allCount), `추천이 ${cards}개뿐 (전체 ${allCount})`);
-  await page.click('.res-opt button.choice:has-text("S등급")');
-  assert.ok((await page.locator('.name-card .grade-pill').allTextContents()).every((t) => t === 'S등급'), 'S등급만 골랐는데 다른 등급이 있음');
-  await page.click('.res-opt button.choice:has-text("전체")');
-  assert.equal(await page.locator('.name-card').count(), Math.min(30, allCount), '전체를 골랐는데 개수가 다름');
-  await page.click('.res-opt button.choice:has-text("S등급")');
-}
+// 결과에는 이름 느낌·등급 버튼 없이 30개를 보여 준다
+assert.equal(await page.locator('.res-opt').count(), 0, '결과에 이름 느낌·등급 버튼이 남아 있음');
+assert.ok((await page.locator('.name-card').count()) >= 30, '추천이 30개보다 적음');
 assert.ok(/^\d+$/.test((await page.locator('.name-card .nc-score b').first().textContent()) ?? ''), '점수에 소수점');
 assert.equal((await page.locator('.name-card .rank').first().textContent())?.trim(), '1', '순위 표시');
 const listScore = (await page.locator('.name-card .nc-score b').first().textContent())?.trim();
@@ -219,16 +211,20 @@ async function single(style, fixed) {
   return page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
 }
 const popularNames = await single('요즘 많이 쓰는');
-// 결과 화면에서 바로 이름 느낌 바꾸기
-await page.click('.res-opt button.choice:has-text("흔하지 않은")');
-await page.waitForFunction((first) => document.querySelector('.name-card .nc-name b:not(.hj)')?.textContent !== first, popularNames[0], { timeout: 40000 });
-const viaChip = await page.locator('.name-card .nc-name b:not(.hj)').allTextContents();
+// 조건 바꾸기 → '무엇을 해 드릴까요?'부터 다시
+await page.click('.res-head a:has-text("조건 바꾸기")');
+await page.waitForSelector('text=무엇을 해 드릴까요?');
+await page.goto(`${BASE}/`);
 const uniqueNames = await single('흔하지 않은');
-assert.deepEqual(viaChip.slice(0, 10), uniqueNames.slice(0, 10), '결과에서 바꾼 이름 느낌과 처음부터 고른 결과가 다름');
+{
+  const a = new Set(popularNames.slice(0, 20));
+  const overlap = uniqueNames.slice(0, 20).filter((n) => a.has(n)).length;
+  assert.ok(overlap <= 2, `요즘 많이 쓰는·흔하지 않은 상위 20개가 ${overlap}개 겹침`);
+}
 const balancedNames = await single('무난한');
 assert.notEqual(popularNames[0], uniqueNames[0], '이름 느낌을 바꿔도 첫 이름이 같음');
 assert.notEqual(popularNames[0], balancedNames[0], '요즘 많이 쓰는·무난한 첫 이름이 같음');
-assert.notDeepEqual(popularNames.slice(0, 10), uniqueNames.slice(0, 10), '이름 느낌을 바꿔도 목록이 같음');
+assert.ok(balancedNames.slice(0, 20).filter((n) => popularNames.slice(0, 20).includes(n)).length <= 2, '요즘 많이 쓰는·무난한이 많이 겹침');
 const fixedNames = await single('무난한', ['희', '熙']);
 assert.ok(fixedNames.length > 0, '돌림자를 걸면 추천이 비어 있음');
 assert.ok(fixedNames.every((n) => n.trim().endsWith('희')), `돌림자 위치: ${fixedNames.slice(0, 3)}`);

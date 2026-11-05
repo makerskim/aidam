@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { Grade, PairHarmony, Recommendation, SajuAnalysis, SajuResult, SiblingSet } from '@aidam/engine';
+import type { PairHarmony, Recommendation, SajuAnalysis, SajuResult, SiblingSet } from '@aidam/engine';
 import { call, errorMessage } from '../lib/engine';
 import { hanjaMeaning } from '../lib/format';
 import { explainCriteria, shortTags, type Criterion } from '../lib/insights';
@@ -13,9 +13,6 @@ import { HarmonyView } from '../components/harmony';
 import { Disclaimer, ErrorText, Icon, Segmented, Staged } from '../components/ui';
 
 const PAGE = 30;
-const GRADES: Grade[] = ['S', 'A', 'B', 'C', 'D'];
-/** 처음에 보여 줄 고를 거리 */
-const ENOUGH = 30;
 const STYLE_LABEL = { popular: '요즘 많이 쓰는', balanced: '무난한', unique: '흔하지 않은' } as const;
 
 type Data =
@@ -110,8 +107,7 @@ function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation;
 interface Ui {
   tab: string;
   sort: 'rec' | 'score' | 'name';
-  /** 등급 고르기. 비어 있으면 30개 이상이 되는 가장 높은 등급까지 */
-  grade: '' | 'S' | 'A' | 'B' | 'all';
+  grade: string;
   shown: number;
   /** 아이마다 고른 이름(한자 열쇠). 다둥이 '아이마다 따로'에서만 쓴다 */
   picks: string[];
@@ -190,48 +186,19 @@ export function Results() {
 
   const tabIndex = Number(ui.tab) || 0;
 
-  /**
-   * 등급 고르기: S등급 / A등급 이상 / B등급 이상 / 전체. 처음에는 고를 거리가 30개 이상 되는 가장 높은 등급까지 보여 준다.
-   * 고치기 옵션이 있으면 그 항목이 좋은 이름 중에서 고른다.
-   */
+  /** 엔진이 정한 순서(이름 느낌 → 등급 → 점수) 그대로 보여 준다. 고치기 옵션이 있으면 그 항목이 좋은 이름만 */
   const filterList = (recs: Recommendation[], saju: SajuAnalysis | null) => {
-    let pool = recs;
-    if (fix && fix !== 'clean') pool = pool.filter((r) => explainCriteria(r.report, saju).find((c) => c.key === fix)?.verdict === 'good');
-    if (fix === 'clean') pool = pool.filter((r) => shortTags(r.report, saju).caution === 0);
-    const upTo = (g: Grade) => pool.filter((r) => GRADES.indexOf(r.report.score.grade) <= GRADES.indexOf(g));
-    const counts = { S: upTo('S').length, A: upTo('A').length, B: upTo('B').length, all: pool.length };
-    const auto = (['S', 'A', 'B'] as const).find((g) => counts[g] >= ENOUGH) ?? 'all';
-    const choice = ui.grade || auto;
-    const list = choice === 'all' ? pool : upTo(choice);
+    let list = recs;
+    if (fix && fix !== 'clean') list = list.filter((r) => explainCriteria(r.report, saju).find((c) => c.key === fix)?.verdict === 'good');
+    if (fix === 'clean') list = list.filter((r) => shortTags(r.report, saju).caution === 0);
     const sorted =
       ui.sort === 'name'
         ? [...list].sort((a, b) => (a.hangul < b.hangul ? -1 : a.hangul > b.hangul ? 1 : 0))
         : ui.sort === 'score'
           ? [...list].sort((a, b) => b.report.score.total - a.report.score.total)
           : list;
-    return { list: sorted, choice, counts };
+    return { list: sorted, hasS: list.some((r) => r.report.score.grade === 'S') };
   };
-
-  /** 이름 느낌은 결과에서 바로 바꿀 수 있다(다시 계산) */
-  const styleRow =
-    state && state.prefs.length === 2 ? (
-      <div className="res-opt">
-        <span className="res-opt-label">이름 느낌</span>
-        <div className="chips">
-          {(['popular', 'balanced', 'unique'] as const).map((style) => (
-            <button
-              key={style}
-              type="button"
-              className="choice"
-              aria-pressed={state.prefs.style === style}
-              onClick={() => state.prefs.style !== style && navigate(`/results?${toQuery({ ...state, prefs: { ...state.prefs, style } })}`, { replace: true })}
-            >
-              {STYLE_LABEL[style]}
-            </button>
-          ))}
-        </div>
-      </div>
-    ) : null;
 
   const kidTabs =
     data?.kind === 'each' ? (
@@ -264,18 +231,12 @@ export function Results() {
   };
 
   const renderList = (recs: Recommendation[], saju: SajuResult | null, kidIndex: number | null) => {
-    const { list, choice, counts } = filterList(recs, saju?.primary ?? null);
+    const { list, hasS } = filterList(recs, saju?.primary ?? null);
     const shown = list.slice(0, ui.shown);
     const styleName = STYLE_LABEL[state.prefs.style];
     const hasFit = list.some((r) => r.fit === 0);
     const firstOther = ui.sort === 'rec' && hasFit ? shown.findIndex((r) => (r.fit ?? 0) > 0) : -1;
     const loosened = state.school.strictMode && list.some((r) => !r.report.score.passesStrict);
-    const gradeOpts = [
-      { value: 'S', label: 'S등급', n: counts.S },
-      { value: 'A', label: 'A등급 이상', n: counts.A },
-      { value: 'B', label: 'B등급 이상', n: counts.B },
-      { value: 'all', label: '전체', n: counts.all },
-    ] as const;
     return (
       <section className="stack" aria-label="추천 이름" style={{ gap: 14 }}>
         <div className="res-tools">
@@ -293,25 +254,14 @@ export function Results() {
             onChange={(sort) => setUi({ sort })}
           />
         </div>
-        <div className="res-opts">
-          {styleRow}
-          <div className="res-opt">
-            <span className="res-opt-label">등급</span>
-            <div className="chips">
-              {gradeOpts.map((o) => (
-                <button key={o.value} type="button" className="choice" aria-pressed={choice === o.value} disabled={o.n === 0} onClick={() => setUi({ grade: o.value, shown: PAGE })}>
-                  {o.label} <span className="num">{o.n}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          {fix ? (
+        {fix ? (
+          <div className="res-filters">
             <button type="button" className="chip chip-primary fix-chip" onClick={() => navigate(`/results?s=${sKey}`, { replace: true })}>
               {FIX_LABEL[fix]} ✕
             </button>
-          ) : null}
-        </div>
-        {counts.S === 0 && state.prefs.fixed ? <p className="note-soft">돌림자 때문에 S등급 이름이 없어요. 돌림자 한자를 바꾸면 더 좋은 이름이 나올 수 있어요.</p> : null}
+          </div>
+        ) : null}
+        {!hasS && state.prefs.fixed ? <p className="note-soft">돌림자 때문에 S등급 이름이 없어요. 돌림자 한자를 바꾸면 더 좋은 이름이 나올 수 있어요.</p> : null}
         {list.length > 0 && !hasFit && state.prefs.length === 2 ? (
           <p className="note-soft">‘{styleName}’ 느낌의 이름은 점수가 낮아, 다른 느낌의 이름을 보여 드려요.</p>
         ) : null}
@@ -453,7 +403,6 @@ export function Results() {
                 <h2>
                   어울리는 이름 세트 <span className="num muted">{data.sets.length}</span>
                 </h2>
-                {styleRow ? <div className="res-opts">{styleRow}</div> : null}
                 {data.sets.length === 0 ? <p className="muted">조건에 맞는 세트가 없어요. 조건을 바꿔 보세요.</p> : null}
                 {data.sets.map((set, si) => (
                   <article key={si} className="set-card">

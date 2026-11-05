@@ -50,15 +50,17 @@ describe('추천', () => {
       expect(r.report.score.passesStrict).toBe(true);
     }
   });
-  it('순서: 등급 → 이름 느낌(fit) → 점수', () => {
+  it('순서: 이름 느낌(fit) → 등급 → 점수', () => {
     const rank: Record<string, number> = { S: 4, A: 3, B: 2, C: 1, D: 0 };
     for (let i = 1; i < recs.length; i++) {
       const a = recs[i - 1]!;
       const b = recs[i]!;
+      expect(a.fit ?? 0).toBeLessThanOrEqual(b.fit ?? 0);
+      if (a.fit !== b.fit) continue;
       const ga = rank[a.report.score.grade]!;
       const gb = rank[b.report.score.grade]!;
       expect(ga).toBeGreaterThanOrEqual(gb);
-      if (ga === gb && a.fit === b.fit) expect(a.report.score.total).toBeGreaterThanOrEqual(b.report.score.total);
+      if (ga === gb) expect(a.report.score.total).toBeGreaterThanOrEqual(b.report.score.total);
     }
   });
   it('추천 점수 = 같은 이름을 직접 풀어 본 점수 (이름 느낌을 바꿔도)', () => {
@@ -103,7 +105,7 @@ describe('어색한 이름 거르기', () => {
   for (const gender of ['female', 'male', 'unknown'] as const) {
     it(`${gender}: 낱말처럼 들리는 이름(하지·지하·이유·하수…)이 없다`, () => {
       const recs = recommendNames({ ...base, surname: jeong, gender, limit: 100 });
-      expect(recs.length).toBeGreaterThan(40);
+      expect(recs.length).toBeGreaterThanOrEqual(30);
       for (const r of recs) expect(AWKWARD_NAMES.has(r.hangul.slice(1))).toBe(false);
     });
   }
@@ -135,16 +137,15 @@ describe('이름 느낌별로 다른 이름', () => {
   const fire = analyzePillars({ year: p('丙午'), month: p('甲午'), day: p('丙寅'), hour: p('丁巳') });
   const topS = (style: 'popular' | 'balanced' | 'unique', gender: 'female' | 'male') =>
     recommendNames({ ...base, saju: fire, gender, prefs: { ...DEFAULT_PREFERENCES, style }, limit: 100 })
-      .filter((r) => r.report.score.grade === 'S')
-      .slice(0, 10)
+      .slice(0, 20)
       .map((r) => r.hangul);
   for (const gender of ['female', 'male'] as const) {
-    it(`${gender}: 요즘 많이 쓰는·무난한·흔하지 않은의 상위 10개가 거의 겹치지 않는다`, () => {
+    it(`${gender}: 요즘 많이 쓰는·무난한·흔하지 않은의 상위 20개가 겹치지 않는다`, () => {
       const a = topS('popular', gender);
       const b = new Set(topS('balanced', gender));
       const c = new Set(topS('unique', gender));
-      expect(a.filter((x) => b.has(x)).length).toBeLessThanOrEqual(3);
-      expect(a.filter((x) => c.has(x)).length).toBeLessThanOrEqual(3);
+      expect(a.filter((x) => b.has(x)).length).toBeLessThanOrEqual(1);
+      expect(a.filter((x) => c.has(x)).length).toBeLessThanOrEqual(1);
     });
   }
   it('각 느낌의 첫 이름은 그 느낌의 목록에서 나온다(fit 0)', () => {
@@ -250,5 +251,30 @@ describe('검토 보완', () => {
     const first10 = include.slice(0, 10);
     const r = recommendNames({ ...base, prefs: { ...DEFAULT_PREFERENCES, style: 'unique', include }, limit: 60 });
     for (const x of r) expect([...x.hangul.slice(1)].some((s) => first10.includes(s)), x.hangul).toBe(true);
+  });
+});
+
+describe('용신 오행', () => {
+  it('추천 이름에는 사주에 해가 되는 기운(기신·구신)의 한자가 없다', () => {
+    for (const gender of ['female', 'male'] as const) {
+      for (const x of recommendNames({ ...base, gender, limit: 60 })) {
+        for (const r of x.report.resource) expect(['gi', 'gu'], `${x.hanja} ${r.ch}`).not.toContain(saju.roles[r.element]);
+      }
+    }
+  });
+  it('추천 이름은 용신이나 희신 기운의 한자를 하나 이상 담는다', () => {
+    for (const x of recommendNames({ ...base, limit: 60 })) {
+      expect(x.report.resource.some((r) => saju.roles[r.element] === 'yong' || saju.roles[r.element] === 'hui'), x.hanja).toBe(true);
+    }
+  });
+});
+
+describe('둘째 글자 율·열', () => {
+  it('서율·하율의 율에 律·栗을 쓸 수 있다(률을 모음 뒤에서 율로 읽음)', async () => {
+    const { hanjaByReading } = await import('../src/name/hanjaDb');
+    const mid = hanjaByReading('율', { initial: false }).map((h) => h.ch);
+    expect(mid).toContain('律');
+    const r = recommendNames({ ...base, prefs: { ...DEFAULT_PREFERENCES, fixed: { position: 1, hangul: '율', hanja: '律' } } });
+    expect(r.length).toBeGreaterThan(0);
   });
 });

@@ -194,12 +194,15 @@ function SajuEvalRow({ r, power }: { r: SajuRow; power: Record<Element, number> 
       <button type="button" className="crit-sum" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className={`vdot ${r.verdict ?? 'need'}`} aria-hidden="true" />
         <span className="cr-text">
-          <b>{r.title}</b>
+          {/* 판정 칩을 제목 옆에 두어 요약 문장이 한 줄을 다 쓰게 한다 */}
+          <span className="cr-title">
+            <b>{r.title}</b>
+            {r.verdict ? <span className={`verdict ${VERDICT_CLS[r.verdict]}`}>{r.verdictText}</span> : null}
+          </span>
           <span>
             <Rich text={r.summary} />
           </span>
         </span>
-        {r.verdict ? <span className={`verdict ${VERDICT_CLS[r.verdict]}`}>{r.verdictText}</span> : null}
         <span className="cr-chev" aria-hidden="true">
           {Icon.down}
         </span>

@@ -549,13 +549,29 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       });
       const bad = report.resource.filter((r) => a.roles[r.element] === 'gi' || a.roles[r.element] === 'gu');
       if (!bad.length) pros.push(`사주와 부딪히는 ${ORDER.filter((e) => a.roles[e] === 'gi').map(plain).join('')} 기운의 한자가 없어서 좋아요.`);
+      const missing = [...new Set(report.resource.filter((r) => a.counts[r.element] === 0 && a.roles[r.element] !== 'gi' && a.roles[r.element] !== 'gu').map((r) => r.element))];
+      if (missing.length) pros.push(`사주 여덟 글자에 하나도 없는 ${missing.map(plain).join('·')} 기운까지 채워 줘요.`);
       if (!report.resource.some((r) => a.roles[r.element] === 'yong' || a.roles[r.element] === 'hui')) cons.push(`이 아이에게 필요한 ${need} 기운을 채우는 한자가 없어요.`);
     }
     const ratio = s.partial && report.resource.length === 0 ? null : s.resource / 30;
+    const ROLE_KO = { yong: '용신', hui: '희신', han: '한신', gu: '구신', gi: '기신' } as const;
+    const table: Criterion['table'] = a
+      ? [
+          { label: '용신', value: `${plain(a.yongsin)} · 꼭 필요한 기운`, tone: 'good' },
+          { label: '희신', value: `${plain(a.huisin)} · 용신을 돕는 기운`, tone: 'good' },
+          { label: '피할 기운', value: `${ORDER.filter((e) => a.roles[e] === 'gi' || a.roles[e] === 'gu').map(plain).join('·')} · 기신·구신`, tone: 'bad' },
+          ...(ORDER.some((e) => a.counts[e] === 0) ? [{ label: '없는 기운', value: `${ORDER.filter((e) => a.counts[e] === 0).map(plain).join('·')} · 사주 여덟 글자에 없음`, tone: 'ok' as Verdict }] : []),
+          ...report.resource.map((r) => {
+            const role = a.roles[r.element];
+            return { label: r.ch, value: `${plain(r.element)} · ${ROLE_KO[role]}`, tone: (role === 'yong' || role === 'hui' ? 'good' : role === 'han' ? 'ok' : 'bad') as Verdict };
+          }),
+        ]
+      : undefined;
     out.push({
       key: 'yongsin',
-      title: '사주를 채워 주나요',
-      why: '사주에서 가장 부족한 기운(용신)을 이름 한자의 기운으로 채워 주면 좋다고 봐요.',
+      title: '용신 오행에 맞나요',
+      why: '사주에 꼭 필요한 기운(용신)과 이를 돕는 기운(희신)을 이름 한자의 오행(자원오행)으로 채우는지 봐요. 사주에 넘치는 기운(기신·구신)은 피해요.',
+      ...(table ? { table } : {}),
       verdict: a ? verdictOf(ratio) : 'ok',
       verdictText: a ? VERDICT_TEXT[verdictOf(ratio)] : '생일 필요',
       pros,

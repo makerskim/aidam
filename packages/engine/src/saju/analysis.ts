@@ -180,6 +180,10 @@ export function analyzePillars(p: Pillars): SajuAnalysis {
   }
 
   const roles = rolesFor(yong, hui);
+  const favor = favorFor(roles, dayMaster, level);
+  // 사주 여덟 글자에 하나도 없는 오행은, 해가 되는 기운(기신·구신)이 아니면 채워 주는 게 좋다고 본다.
+  // 많은 작명 앱이 쓰는 '부족한 오행 채우기'와도 어긋나지 않게 한다.
+  for (const e of ELEMENTS) if (counts[e] === 0 && roles[e] === 'han') favor[e] = Math.max(favor[e], 0.5);
   return {
     pillars: p,
     dayMaster,
@@ -192,7 +196,7 @@ export function analyzePillars(p: Pillars): SajuAnalysis {
     roles,
     yongsin: yong,
     huisin: hui,
-    favor: favorFor(roles, dayMaster, level),
+    favor,
     reasoning,
   };
 }
@@ -200,12 +204,16 @@ export function analyzePillars(p: Pillars): SajuAnalysis {
 /** 용신·희신을 바꿔 역할과 선호도를 다시 계산 (시간 모름 다수결용) */
 export function withYongsin(a: SajuAnalysis, yong: Element, hui: Element, note: string): SajuAnalysis {
   const roles = rolesFor(yong, hui);
+  const favor = favorFor(roles, a.dayMaster, a.strength.level);
+  // 사주 여덟 글자에 하나도 없는 오행은, 해가 되는 기운(기신·구신)이 아니면 채워 주는 게 좋다고 본다.
+  // 많은 작명 앱이 쓰는 '부족한 오행 채우기'와도 어긋나지 않게 한다.
+  for (const e of ELEMENTS) if (a.counts[e] === 0 && roles[e] === 'han') favor[e] = Math.max(favor[e], 0.5);
   return {
     ...a,
     yongsin: yong,
     huisin: hui,
     roles,
-    favor: favorFor(roles, a.dayMaster, a.strength.level),
+    favor,
     reasoning: [...a.reasoning, note],
   };
 }

@@ -63,7 +63,8 @@ function fromState(s: NameState): Draft {
   const kids = s.kids?.length ? s.kids.map((k) => ({ gender: k.gender, timeKnown: k.time !== null, time: k.time ? `${pad(k.time.hour)}:${pad(k.time.minute)}` : '' })) : [];
   return {
     ...EMPTY,
-    step: 'prefs',
+    // 결과에서 '조건 바꾸기'로 오면 '무엇을 해 드릴까요?'부터 다시 고른다(입력한 값은 그대로)
+    step: 'purpose',
     purpose: 'new',
     surname: s.surname,
     count: kids.length > 1 ? kids.length : 1,
