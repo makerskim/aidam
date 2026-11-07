@@ -98,3 +98,35 @@ describe('다둥이 다섯 명 이상', () => {
     }
   });
 });
+
+describe('사용자 확인 사례: 김수호(秀岵)', () => {
+  const input = { surname: [{ hangul: '김', hanja: '金' }], given: [{ hangul: '수', hanja: '秀' }, { hangul: '호', hanja: '岵' }], gender: 'male' as const };
+  it('4격(15·15·16·23)이 모두 길하다', () => {
+    const r = analyzeName(input, null, DEFAULT_SCHOOL_OPTIONS);
+    expect(r.frameResults.map((f) => f.n)).toEqual([15, 15, 16, 23]);
+    expect(r.frameResults.every((f) => f.info.luck === 'good')).toBe(true);
+  });
+  it('생일이 없으면 한자오행으로 깎지 않는다(정통 A등급 이상)', () => {
+    const r = analyzeName(input, null, DEFAULT_SCHOOL_OPTIONS);
+    expect(r.score.total).toBeGreaterThanOrEqual(80);
+  });
+  it('실용 작명법(운해본·받침까지)으로는 소리 상극이 없다', () => {
+    const r = analyzeName(input, null, { ...DEFAULT_SCHOOL_OPTIONS, yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app', includeFinalConsonant: true });
+    expect(r.soundBySchool.unhae.pairs.some((p) => p.kind === 'clash')).toBe(false);
+    expect(r.score.total).toBeGreaterThanOrEqual(85);
+  });
+});
+
+describe('이름 자료', () => {
+  it('많이 쓰는 이름이 남녀 각각 240개 이상, 하랑·라온·로운도 한자가 붙는다', async () => {
+    const { COMMON_NAMES } = await import('../src/recommend/syllables');
+    expect(COMMON_NAMES.female.length).toBeGreaterThanOrEqual(240);
+    expect(COMMON_NAMES.male.length).toBeGreaterThanOrEqual(240);
+    for (const [name, g] of [['하랑', 'male'], ['라온', 'female'], ['로운', 'male']] as const) {
+      const r = analyzeName({ surname: [{ hangul: '김', hanja: '金' }], given: [...name].map((h) => ({ hangul: h, hanja: null })), gender: g }, null, DEFAULT_SCHOOL_OPTIONS);
+      expect(r.score.total, name).toBeGreaterThan(0);
+    }
+    const r = recommendNames({ surname: [{ hangul: '김', hanja: '金' }], gender: 'male', saju, prefs: { ...DEFAULT_PREFERENCES, fixed: { position: 1, hangul: '랑', hanja: '朗' } }, options: DEFAULT_SCHOOL_OPTIONS, limit: 40 });
+    expect(r.length).toBeGreaterThan(0);
+  });
+});

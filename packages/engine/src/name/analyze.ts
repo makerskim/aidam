@@ -223,7 +223,9 @@ export function analyzeName(
   }));
   let resourcePts: number | null = null;
   if (givenKnown) {
-    resourcePts = resourcePointsFor(chars as HanjaEntry[], saju);
+    // 생일(사주)이 없으면 용신을 알 수 없으므로 한자오행은 점수에서 빼고 나머지 영역으로 계산한다
+    // (한자끼리의 오행 관계로 깎던 방식은 표준이 아니라서 없앴다)
+    resourcePts = saju ? resourcePointsFor(chars as HanjaEntry[], saju) : null;
     if (saju) {
       reasons.push({ area: 'saju', tone: 'neutral', text: `이 사주의 용신은 ${elName(saju.yongsin)}, 희신은 ${elName(saju.huisin)}입니다.` });
       for (const r of resource) {
@@ -236,7 +238,7 @@ export function analyzeName(
         });
       }
     } else {
-      warnings.push('출생 정보(사주)가 없어 용신 보완은 평가하지 못하고, 한자 오행끼리의 흐름만 봤어요.');
+      warnings.push('출생 정보(사주)가 없어 한자오행(용신)은 점수에서 빼고, 나머지 영역으로 100점 환산했어요.');
       for (const r of resource) reasons.push({ area: 'resource', tone: 'neutral', text: `${r.ch} 자원오행 ${elName(r.element)}` });
     }
   }
@@ -356,7 +358,7 @@ export function analyzeName(
     areaMax,
     yinyangMaxWithoutStrokes: 4 * yyScale,
   });
-  if (score.partial) warnings.push('한자를 고르지 않은 글자가 있어 자원오행·수리는 빼고 계산했어요.');
+  if (score.partial && !givenKnown) warnings.push('한자를 고르지 않은 글자가 있어 자원오행·수리는 빼고 계산했어요.');
 
   const code = analysisCode({
     input, options, preference,

@@ -6,7 +6,7 @@ import type { SchoolOptions } from '@aidam/engine';
  * - 실용 작명법: 부족한 오행 용신, 운해본, 실용 배점(수리오행 15점), 부수 기준 한자오행 — 시중 작명 앱·작명소에서 널리 쓰는 방식
  * 알고리즘 전체는 docs/naming-algorithm.md
  */
-export type BasisKey = 'yongsinMethod' | 'soundSchool' | 'scoring' | 'hanjaElement';
+export type BasisKey = 'yongsinMethod' | 'soundSchool' | 'finalConsonant' | 'scoring' | 'hanjaElement';
 
 export interface BasisItem {
   key: BasisKey;
@@ -35,6 +35,15 @@ export const BASIS_ITEMS: BasisItem[] = [
     ],
   },
   {
+    key: 'finalConsonant',
+    label: '발음오행 받침',
+    desc: '첫소리만 볼지, 받침(김의 ㅁ, 박의 ㄱ)까지 소리 순서에 넣을지예요. 받침까지 보면 김수호처럼 첫소리끼리는 부딪혀도 받침이 이어 주는 이름이 있어요.',
+    options: [
+      { value: 'off', label: '첫소리만' },
+      { value: 'on', label: '받침까지' },
+    ],
+  },
+  {
     key: 'scoring',
     label: '배점 (수리오행 포함)',
     desc: '정통: 한자오행 30 · 수리 25(수리오행 3) · 발음 20 · 음양 10 · 뜻 15. 실용: 한자오행 25 · 수리 40(수리오행 15) · 발음 20 · 음양 15.',
@@ -55,20 +64,27 @@ export const BASIS_ITEMS: BasisItem[] = [
 ];
 
 export const PRESETS = {
-  classic: { yongsinMethod: 'eokbu', soundSchool: 'haerye', scoring: 'classic', hanjaElement: 'radical' },
-  app: { yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app', hanjaElement: 'radical' },
+  classic: { yongsinMethod: 'eokbu', soundSchool: 'haerye', finalConsonant: 'off', scoring: 'classic', hanjaElement: 'radical' },
+  app: { yongsinMethod: 'lacking', soundSchool: 'unhae', finalConsonant: 'on', scoring: 'app', hanjaElement: 'radical' },
 } as const satisfies Record<string, Record<BasisKey, string>>;
 
 export const PRESET_LABEL = { classic: '정통 성명학', app: '실용 작명법' } as const;
 /** 묶음 한 줄 설명 */
 export const PRESET_DESC = {
-  classic: '억부·조후 용신 · 해례본 · 뜻까지 보는 배점',
-  app: '부족한 오행 용신 · 운해본 · 수리 중심 배점',
+  classic: '억부·조후 용신 · 해례본 첫소리 · 뜻까지 보는 배점',
+  app: '부족한 오행 용신 · 운해본 받침까지 · 수리 중심 배점',
 } as const;
 
 export function basisValue(school: SchoolOptions, key: BasisKey): string {
+  if (key === 'finalConsonant') return school.includeFinalConsonant ? 'on' : 'off';
   const defaults: Record<BasisKey, string> = PRESETS.classic;
   return (school[key] as string | undefined) ?? defaults[key];
+}
+
+/** 한 항목을 바꾼 계산 기준 */
+export function withBasis(school: SchoolOptions, key: BasisKey, value: string): SchoolOptions {
+  if (key === 'finalConsonant') return { ...school, includeFinalConsonant: value === 'on' };
+  return { ...school, [key]: value };
 }
 
 /** 지금 기준이 어느 묶음과 같은지(둘 다 아니면 null) */
@@ -80,7 +96,9 @@ export function presetOf(school: SchoolOptions): keyof typeof PRESETS | null {
 }
 
 export function withPreset(school: SchoolOptions, k: keyof typeof PRESETS): SchoolOptions {
-  return { ...school, ...(PRESETS[k] as unknown as Partial<SchoolOptions>) };
+  let out = { ...school };
+  for (const it of BASIS_ITEMS) out = withBasis(out, it.key, PRESETS[k][it.key]);
+  return out;
 }
 
 /** 한 줄 요약: "억부·조후 · 해례본 · 수리오행 가볍게 · 부수 기준" */

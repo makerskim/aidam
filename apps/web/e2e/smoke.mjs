@@ -206,7 +206,7 @@ console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 // 8a) 계산 기준 바꾸기: 정통 성명학 → 실용 작명법 (다시 계산하고 기준이 바뀐다)
 const classicCards = (await page.locator('.name-card').allInnerTexts()).slice(0, 10).join('|');
 await page.click('.basis-head');
-assert.equal(await page.locator('.basis-row').count(), 4, '계산 기준 항목 4개(용신·발음오행·배점·한자오행)');
+assert.equal(await page.locator('.basis-row').count(), 5, '계산 기준 항목 5개(용신·발음오행·받침·배점·한자오행)');
 await page.click('.basis-body .bp-item:has-text("실용 작명법")');
 await page.waitForSelector('.basis-head:has-text("실용 작명법")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });

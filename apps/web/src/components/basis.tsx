@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { SchoolOptions } from '@aidam/engine';
-import { BASIS_ITEMS, basisSummary, basisValue, PRESET_DESC, PRESET_LABEL, PRESETS, presetOf, withPreset } from '../lib/basis';
+import { BASIS_ITEMS, basisSummary, basisValue, PRESET_DESC, PRESET_LABEL, PRESETS, presetOf, withBasis, withPreset } from '../lib/basis';
 import { Icon, Segmented } from './ui';
 
 /** 계산 기준 고르기: 평소엔 한 줄, 누르면 묶음(정통·실용)과 항목별 두 가지 선택 */
@@ -22,7 +22,9 @@ export function BasisPicker({ school, onChange }: { school: SchoolOptions; onCha
             {(Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => (
               <button key={k} type="button" className="bp-item" aria-pressed={preset === k} onClick={() => onChange(withPreset(school, k))}>
                 <b>{PRESET_LABEL[k]}</b>
-                <span>{PRESET_DESC[k]}</span>
+                {PRESET_DESC[k].split(' · ').map((part) => (
+                  <span key={part}>{part}</span>
+                ))}
               </button>
             ))}
           </div>
@@ -32,7 +34,7 @@ export function BasisPicker({ school, onChange }: { school: SchoolOptions; onCha
                 <b>{it.label}</b>
                 <p>{it.desc}</p>
               </div>
-              <Segmented label={it.label} value={basisValue(school, it.key)} options={it.options} onChange={(v) => onChange({ ...school, [it.key]: v })} />
+              <Segmented label={it.label} value={basisValue(school, it.key)} options={it.options} onChange={(v) => onChange(withBasis(school, it.key, v))} />
             </div>
           ))}
         </div>

@@ -3450,7 +3450,7 @@ img {
 .bp-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
   padding: 12px 14px;
   border: 1.5px solid var(--line);
   border-radius: 14px;
@@ -3464,6 +3464,7 @@ img {
   color: var(--ink);
 }
 .bp-item span {
+  display: block;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-3);

@@ -65,7 +65,7 @@ export function CalcTrace({ report, saju }: { report: NameReport; saju: SajuResu
     });
   }
   steps.push({
-    title: `⑤ 발음오행(${school === 'unhae' ? '운해본' : '해례본'}) ${r1(s.sound)} / ${m.sound}`,
+    title: `⑤ 발음오행(${school === 'unhae' ? '운해본' : '해례본'}${report.options.includeFinalConsonant ? '·받침까지' : ''}) ${r1(s.sound)} / ${m.sound}`,
     lines: [
       flow.elements.map((e, i) => `${syl[i] ?? ''}(${e ? KO[e] : '?'})`).join(' → '),
       ...flow.pairs.map((q) => `${KO[q.from]}→${KO[q.to]} ${FLOW[q.kind]} ${q.score}`),

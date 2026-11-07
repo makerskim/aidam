@@ -168,7 +168,7 @@ function allowedAt(level: Level, weights: number[], hangul: string, known: Set<s
 /** 고를 거리가 되도록 적어도 이만큼은 보여 준다(limit보다 크면 limit) */
 const MIN_TOTAL = 30;
 /** 고른 느낌의 이름이 이만큼 있으면 다른 느낌 이름은 섞지 않는다 */
-const STYLE_ENOUGH = 20;
+const STYLE_ENOUGH = 30;
 
 interface HangulCandidate {
   syllables: string[];
@@ -185,7 +185,10 @@ interface HangulCandidate {
 /** 대표음(첫 음)이 그 음절인 한자만 (別音으로 읽히는 글자 제외). 이름 첫 자는 두음법칙 허용 */
 function primaryReadingMatches(h: HanjaEntry, syllable: string, initial: boolean): boolean {
   const primary = h.readings[0] ?? '';
-  return primary === syllable || (initial ? applyDueum(primary) === syllable : MID_LIQUID[syllable] === primary);
+  // 대표음이 그 소리이거나, 대표음이 그 소리의 두음 형태(朗 낭→랑, 羅 나→라, 林 임→림)인 경우.
+  // 이름 첫 글자는 두음법칙 형태(려→여)도, 둘째 글자 이후 율·열은 률·렬 한자도 허용
+  if (primary === syllable || applyDueum(syllable) === primary) return h.readings.includes(syllable) || primary === syllable;
+  return initial ? applyDueum(primary) === syllable : MID_LIQUID[syllable] === primary;
 }
 
 function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis | null, options: SchoolOptions): HanjaEntry[] {
@@ -218,7 +221,7 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
  * 1) 음절 조합 → 소리 규칙으로 한글 이름 상위 1,500개  2) 음절별 한자 상위 12개
  * 3) 4격·채점 → 한글 이름당 상위 2개 조합  4) 상위 후보를 정식 분석(analyzeName)으로 확정
  * 고른 이름 느낌의 실제 이름부터 찾고, 좋은 이름이 모자라면 한 단계씩 넓힌다(Level).
- * 순서: 점수 높은 순. 고른 느낌의 이름이 20개 이상이면 그 이름만 낸다.
+ * 순서: 점수 높은 순. 고른 느낌의 이름이 30개 이상이면 그 이름만 낸다.
  */
 export function recommendNames(args: RecommendArgs): Recommendation[] {
   const { surname, gender, prefs, options } = args;

@@ -25,7 +25,7 @@ import {
   type SajuResult,
   type SchoolOptions,
 } from '@aidam/engine';
-import { PRESETS } from './basis';
+import { PRESETS, withPreset } from './basis';
 import { FAMILIAR_HANJA } from '@aidam/engine/src/recommend/syllables';
 import type { AnalyzeState, NameState } from './state';
 import { KID_LABELS, kidBirth, surnameChars } from './state';
@@ -120,7 +120,7 @@ export const api = {
     // 같은 이름을 두 기준(정통 성명학·실용 작명법)으로 함께 채점해 비교해 보여 준다
     const base = state.birth ? computeSaju(state.birth, state.sajuOpts).primary : null;
     const compare = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => {
-      const r = analyzeName(input, base, { ...state.school, ...(PRESETS[k] as unknown as Partial<SchoolOptions>) });
+      const r = analyzeName(input, base, withPreset(state.school, k));
       return { key: k, total: r.score.total, grade: r.score.grade, partial: r.score.partial };
     });
     return { saju, report, better, compare };

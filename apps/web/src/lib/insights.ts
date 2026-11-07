@@ -112,7 +112,7 @@ export function scoreRows(report: NameReport, saju: SajuAnalysis | null): ScoreR
       key: 'resource',
       label: '사주 보완(자원오행)',
       max: M.resource,
-      score: report.resource.length === report.input.given.length && report.resource.length > 0 ? s.resource : null,
+      score: saju && report.resource.length === report.input.given.length && report.resource.length > 0 ? s.resource : null,
       verdict: !saju ? '사주 없이 계산' : yong.length ? `${yong.map((r) => ELEMENT_HANJA[r.element]).join('·')} 기운 보완` : against.length ? '사주와 맞지 않음' : '보완 약함',
       tone: !saju ? 'neutral' : yong.length && !against.length ? 'good' : against.length ? 'bad' : 'neutral',
     },
@@ -579,7 +579,7 @@ export function explainCriteria(report: NameReport, a: SajuAnalysis | null): Cri
       verdictText: a ? VERDICT_TEXT[verdictOf(ratio)] : '생일 필요',
       pros,
       cons,
-      score: report.resource.length ? s.resource : null,
+      score: a && report.resource.length ? s.resource : null,
       max: M.resource,
       summary: '',
     });
