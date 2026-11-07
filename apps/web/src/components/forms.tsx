@@ -5,6 +5,7 @@ import { call } from '../lib/engine';
 import type { HanjaOption } from '../lib/api';
 import type { SurnameSel } from '../lib/state';
 import { surnameInfo } from '../lib/surname-info';
+import { hanjaMeaning, isRareGlyph } from '../lib/format';
 import { ElementChip, Field, Icon, Picker, Segmented, Switch, type PickerGroup } from './ui';
 
 // ── 엔진 초기 데이터(성씨 목록) ─────────────────────────
@@ -644,6 +645,7 @@ export function HanjaPicker({
 }) {
   const [options, setOptions] = useState<HanjaOption[] | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [q, setQ] = useState('');
   const depKey = JSON.stringify([syllable, initial, birth, sajuOpts]);
   useEffect(() => {
     let alive = true;
@@ -659,15 +661,29 @@ export function HanjaPicker({
   }, [depKey]);
 
   if (!options) return <p className="small muted">불러오는 중…</p>;
-  const good = options.filter((o) => o.nameUse && !o.negative && o.meaning);
-  const shown = showAll ? options : good.slice(0, 15);
+  // 뜻 자료가 없거나 글꼴에서 네모로 보일 수 있는 드문 한자는 빼고 보여 준다(고른 한자는 그대로 둔다)
+  const visible = options.filter((o) => o.ch === value || (o.meaning.trim() && !isRareGlyph(o.ch)));
+  const hidden = options.length - visible.length;
+  const good = visible.filter((o) => o.nameUse && !o.negative);
+  // 뜻(산·넓을…)이나 한자(岵)로 찾기
+  const query = q.trim();
+  const found = query ? options.filter((o) => o.ch === query || [...query].some((c) => c === o.ch) || (o.meaning && o.meaning.includes(query))) : null;
+  const shown = found ?? (showAll ? visible : good.slice(0, 24));
   return (
     <div className="stack">
+      <input
+        className="input hanja-search"
+        placeholder={`'${syllable}' 한자를 뜻이나 한자로 찾기 (예: 산, 넓을)`}
+        aria-label={`${syllable} 한자 찾기`}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      {found && found.length === 0 ? <p className="small muted">‘{query}’에 맞는 ‘{syllable}’ 한자가 없어요.</p> : null}
       <div className="hanja-grid" role="group" aria-label={`${syllable} 한자`}>
         {shown.map((o) => (
           <button key={o.ch} type="button" className="hanja-opt" aria-pressed={value === o.ch} onClick={() => onChange(value === o.ch ? null : o.ch)}>
             <span className="big">{o.ch}</span>
-            <span className="m">{o.meaning.split(',')[0] || '—'}</span>
+            <span className="m">{hanjaMeaning(o, syllable) || '뜻 정보 없음'}</span>
             <span className="row" style={{ justifyContent: 'center', gap: 4 }}>
               <ElementChip element={o.element} withName />
             </span>
@@ -677,11 +693,12 @@ export function HanjaPicker({
           </button>
         ))}
       </div>
-      {options.length > shown.length ? (
+      {!found && visible.length > shown.length ? (
         <button type="button" className="text-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setShowAll(true)}>
-          한자 {options.length}자 모두 보기
+          한자 {visible.length}자 모두 보기
         </button>
       ) : null}
+      {showAll && hidden > 0 ? <p className="small muted">뜻 자료가 없거나 글꼴에서 보이지 않는 드문 한자 {hidden}자는 뺐어요.</p> : null}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   hanjaByReading,
   isNameHanja,
   isPositiveMeaning,
+  recommendBoth,
   recommendNames,
   recommendSiblingSets,
   sajuForMethod,
@@ -65,7 +66,7 @@ export const api = {
   },
   recommend(state: NameState) {
     const saju = state.birth ? sajuWith(state.birth, state.sajuOpts, state.school) : null;
-    const recs = recommendNames({
+    const recs = (state.school.dual ? recommendBoth : recommendNames)({
       surname: surnameChars(state.surname),
       gender: state.gender,
       saju: saju?.primary ?? null,
@@ -97,7 +98,7 @@ export const api = {
     const out = kids.map((k, i) => {
       const birth = state.birth ? { ...state.birth, time: k.time } : null;
       const saju = birth ? sajuWith(birth, state.sajuOpts, state.school) : null;
-      const recs = recommendNames({ surname: surnameChars(state.surname), gender: k.gender, saju: saju?.primary ?? null, prefs: state.prefs, options: state.school, limit: 100 });
+      const recs = (state.school.dual ? recommendBoth : recommendNames)({ surname: surnameChars(state.surname), gender: k.gender, saju: saju?.primary ?? null, prefs: state.prefs, options: state.school, limit: 100 });
       return { label: KID_LABELS[i] ?? `${i + 1}`, gender: k.gender, saju, recs };
     });
     const pillarsOf = (s: (typeof out)[number]['saju']) => (s ? JSON.stringify(s.base.pillars) : '');

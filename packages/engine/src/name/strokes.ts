@@ -49,7 +49,15 @@ export function primaryRadical(rs: string): RadicalStroke {
   return pool.find((r) => VARIANT_RADICALS.has(r.radical)) ?? (pool[0] as RadicalStroke);
 }
 
+/**
+ * 자료(Unicode 현대 자형)와 강희자전 원획이 다른 이름 한자를 바로잡는다.
+ * 성명학 원획은 강희자전 기준: 熙·煕 = 火4+9, 誠 = 言7+成7, 城 = 土3+成7, 延 = 廴3+4, 導 = 寸3+道13, 致 = 至6+攵4.
+ */
+export const STROKE_FIX: Readonly<Record<string, number>> = { 熙: 13, 煕: 13, 誠: 14, 城: 10, 延: 7, 導: 16, 致: 10 };
+
 export function computeWonStrokes(ch: string, rs: string, totalStrokes: number): number {
+  const fixed = STROKE_FIX[ch];
+  if (fixed !== undefined) return fixed;
   const numeral = NUMERAL_STROKES[ch];
   if (numeral !== undefined) return numeral;
   const r = primaryRadical(rs);

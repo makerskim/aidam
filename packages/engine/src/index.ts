@@ -31,7 +31,7 @@ export {
 } from './name/analyze';
 export { MAX as SCORE_MAX, PROFILE_MAX, gradeOf, type ScoreBreakdown, type Grade, type AreaMax } from './score/score';
 export {
-  recommendNames, suggestBetterHanja, DEFAULT_PREFERENCES, type Preferences, type Recommendation,
+  recommendNames, recommendBoth, CLASSIC_BASIS, PRACTICAL_BASIS, suggestBetterHanja, DEFAULT_PREFERENCES, type Preferences, type Recommendation,
 } from './recommend/recommend';
 export { analyzeSiblings, recommendSiblingSets, nameDistinctness, type ChildInput, type PairHarmony, type SiblingReport, type SiblingSet } from './siblings/siblings';
 export { encodeState, decodeState } from './share/state';

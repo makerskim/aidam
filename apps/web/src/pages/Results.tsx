@@ -14,6 +14,9 @@ import { BasisPicker } from '../components/basis';
 import { Disclaimer, ErrorText, Icon, Segmented, Staged } from '../components/ui';
 
 const PAGE = 30;
+/** 목록 점수: '두 기준 모두'면 두 기준 중 낮은 쪽 */
+const scoreOf = (r: Recommendation) => (r.dual ? Math.min(r.dual.classic.total, r.dual.practical.total) : r.report.score.total);
+const gradeFromTotal = (t: number) => (t >= 90 ? 'S' : t >= 80 ? 'A' : t >= 70 ? 'B' : t >= 60 ? 'C' : 'D');
 const STYLE_LABEL = { popular: '요즘 많이 쓰는', balanced: '무난한', unique: '흔하지 않은' } as const;
 
 type Data =
@@ -62,7 +65,9 @@ function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation;
   const query = to.split('?')[1] ?? '';
   const meaning = rec.report.chars.map((h, i) => (h ? hanjaMeaning(h, rec.report.input.given[i]?.hangul ?? '') : '')).join(' · ');
   const saved = lib.isBookmarked(rec.hanja, query);
-  const total = Math.round(rec.report.score.total);
+  // '두 기준 모두'면 두 기준 중 낮은 쪽 점수를 크게, 두 점수를 함께 보여 준다
+  const total = Math.round(scoreOf(rec));
+  const grade = rec.dual ? gradeFromTotal(scoreOf(rec)) : rec.report.score.grade;
   return (
     <div className={`name-card ${pick ? 'pickable' : ''} ${pick?.on ? 'picked' : ''}`}>
       <Link to={to} state={{ from: location.pathname + location.search, rank }} className="nc-link" onClick={onOpen}>
@@ -74,10 +79,15 @@ function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation;
             <b className="hj">{rec.hanja}</b>
           </span>
           <span className="nc-meaning">{meaning}</span>
+          {rec.dual ? (
+            <span className="nc-dual">
+              정통 {Math.round(rec.dual.classic.total)} · 실용 {Math.round(rec.dual.practical.total)}
+            </span>
+          ) : null}
         </span>
         <span className="nc-score">
           <b className="num">{total}</b>
-          <span className={`grade-pill g-${rec.report.score.grade}`}>{rec.report.score.grade}등급</span>
+          <span className={`grade-pill g-${grade}`}>{grade}등급</span>
         </span>
       </Link>
       <button
@@ -196,7 +206,7 @@ export function Results() {
     const sorted =
       ui.sort === 'name'
         ? [...list].sort((a, b) => (a.hangul < b.hangul ? -1 : a.hangul > b.hangul ? 1 : 0))
-        : [...list].sort((a, b) => b.report.score.total - a.report.score.total);
+        : [...list].sort((a, b) => scoreOf(b) - scoreOf(a));
     return { list: sorted, hasS: list.some((r) => r.report.score.grade === 'S') };
   };
 

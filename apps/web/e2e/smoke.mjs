@@ -215,7 +215,19 @@ if (!(await page.locator('.basis.open').count())) await page.click('.basis-head'
 await page.click('.basis-row:has-text("발음오행") .seg button:has-text("해례본")');
 await page.waitForSelector('.basis-head:has-text("부족한 오행 · 해례본")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
-console.log('✓ 계산 기준 고르기(묶음·항목별)');
+// 두 기준 모두 좋은 이름
+if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
+await page.click('.basis-body .bp-item:has-text("두 기준 모두")');
+await page.waitForSelector('.basis-head:has-text("두 기준 모두")', { timeout: 10000 });
+await page.waitForSelector('.name-card .nc-dual', { timeout: 40000 });
+{
+  const scores = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-score b').allTextContents()).map(Number);
+  assert.deepEqual([...scores].sort((a, b) => b - a), scores, '두 기준 모두: 낮은 쪽 점수 순이 아님');
+  const dual = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-dual').first().textContent()) ?? '';
+  const [c, p] = (dual.match(/\d+/g) ?? []).map(Number);
+  assert.equal(scores[0], Math.min(c ?? 0, p ?? 0), `큰 점수가 두 기준 중 낮은 쪽이 아님 (${dual})`);
+}
+console.log('✓ 계산 기준 고르기(묶음·항목별·두 기준 모두)');
 
 // 8b) 이름 느낌마다 다른 이름 · 돌림자를 걸어도 추천이 비지 않음
 async function single(style, fixed) {
@@ -267,6 +279,14 @@ await page.waitForSelector('#given');
 await page.fill('#given', '하윤');
 await page.waitForSelector('[aria-label="하 한자"] .hanja-opt >> nth=2');
 assert.equal(await page.locator('text=한글만').count(), 0, '한글만 칸이 남아 있음');
+// 한자 찾기: 뜻으로 찾으면 뒤쪽에 있는 한자도 바로 나온다 (호 → 산 → 岵)
+await page.fill('#given', '수호');
+await page.waitForSelector('[aria-label="호 한자"] .hanja-opt >> nth=2');
+await page.fill('input[aria-label="호 한자 찾기"]', '산');
+await page.waitForSelector('[aria-label="호 한자"] .hanja-opt:has-text("岵")', { timeout: 5000 });
+assert.ok((await page.locator('[aria-label="호 한자"] .hanja-opt:has-text("岵") .m').textContent())?.includes('산 호'), '岵 뜻(산 호) 표시 없음');
+await page.fill('#given', '하윤');
+await page.waitForSelector('[aria-label="하 한자"] .hanja-opt >> nth=2');
 await page.click('[aria-label="하 한자"] .hanja-opt:has-text("河")');
 await page.click('button:has-text("다음")');
 await page.click('button.tile:has-text("여자아이")');

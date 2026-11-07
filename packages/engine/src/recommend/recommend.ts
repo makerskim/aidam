@@ -39,6 +39,8 @@ export interface Recommendation {
    * 2: 조건 때문에 넓혀 찾은 조합(목록에 없는 이름). 점수와는 상관없고 순서에만 쓴다.
    */
   fit?: 0 | 1 | 2;
+  /** '두 기준 모두'로 찾았을 때: 정통 성명학·실용 작명법 점수 */
+  dual?: { classic: { total: number; grade: string }; practical: { total: number; grade: string } };
 }
 
 export interface RecommendArgs {
@@ -478,4 +480,39 @@ export function suggestBetterHanja(
   }
   out.sort((a, b) => b.report.score.total - a.report.score.total || cmpCodePoints(a.hanja, b.hanja));
   return out.slice(0, limit);
+}
+
+/** 정통 성명학 / 실용 작명법 기준(나머지 설정은 그대로) */
+export const CLASSIC_BASIS: Partial<SchoolOptions> = { yongsinMethod: 'eokbu', soundSchool: 'haerye', includeFinalConsonant: false, scoring: 'classic', hanjaElement: 'radical' };
+export const PRACTICAL_BASIS: Partial<SchoolOptions> = { yongsinMethod: 'lacking', soundSchool: 'unhae', includeFinalConsonant: true, scoring: 'app', hanjaElement: 'radical' };
+
+/**
+ * 두 기준 모두에서 좋은 이름. 정통 성명학·실용 작명법으로 각각 후보를 찾아 합친 뒤,
+ * 같은 이름을 두 기준으로 다시 채점해 '낮은 쪽 점수'가 높은 순으로 고른다(둘 다 좋은 이름이 앞에).
+ * 보여 주는 풀이(report)는 정통 성명학 기준, 두 점수는 dual에 담는다.
+ */
+export function recommendBoth(args: RecommendArgs): Recommendation[] {
+  const limit = args.limit ?? 100;
+  const base = { ...args.options, dual: false };
+  const classic = { ...base, ...CLASSIC_BASIS };
+  const practical = { ...base, ...PRACTICAL_BASIS };
+  const wide = Math.max(limit * 2, 120);
+  const pool = new Map<string, Recommendation>();
+  for (const r of [...recommendNames({ ...args, options: classic, limit: wide }), ...recommendNames({ ...args, options: practical, limit: wide })]) {
+    if (!pool.has(r.hanja)) pool.set(r.hanja, r);
+  }
+  const scored = [...pool.values()].map((r) => {
+    const input = r.report.input;
+    const a = analyzeName(input, args.saju, classic);
+    const b = analyzeName(input, args.saju, practical);
+    return {
+      ...r,
+      report: a,
+      dual: { classic: { total: a.score.total, grade: a.score.grade }, practical: { total: b.score.total, grade: b.score.grade } },
+      low: Math.min(a.score.total, b.score.total),
+      avg: (a.score.total + b.score.total) / 2,
+    };
+  });
+  scored.sort((x, y) => y.low - x.low || y.avg - x.avg || cmpCodePoints(x.hangul, y.hangul) || cmpCodePoints(x.hanja, y.hanja));
+  return scored.slice(0, limit).map(({ low: _l, avg: _a, ...r }) => r);
 }

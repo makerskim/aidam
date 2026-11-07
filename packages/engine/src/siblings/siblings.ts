@@ -3,7 +3,7 @@ import { BRANCHES, STEMS, ZODIAC_KO } from '../core/ganji';
 import { decompose } from '../hangul/jamo';
 import { analyzeName, type Gender, type NameChar, type NameReport, type SchoolOptions } from '../name/analyze';
 import { soundElement } from '../name/sound';
-import { recommendNames, type Preferences, type Recommendation } from '../recommend/recommend';
+import { recommendBoth, recommendNames, type Preferences, type Recommendation } from '../recommend/recommend';
 import { computeSaju, type SajuResult } from '../saju';
 import { BRANCH_RELATION_KO, branchRelations, stemRelation, type BranchRelation } from '../saju/relations';
 import type { BirthInput, SajuOptions } from '../saju/pillars';
@@ -191,7 +191,7 @@ export function recommendSiblingSets(
       const report = analyzeName({ surname, given: c.given, gender: c.gender }, saju, schoolOpts);
       return [{ hangul: surHangul + c.given.map((g) => g.hangul).join(''), hanja: surHanja + c.given.map((g) => g.hanja ?? '').join(''), report }];
     }
-    return recommendNames({ surname, gender: c.gender, saju, prefs, options: schoolOpts, limit: per });
+    return (schoolOpts.dual ? recommendBoth : recommendNames)({ surname, gender: c.gender, saju, prefs, options: schoolOpts, limit: per });
   });
 
   const sajuPairs = new Map<string, PairHarmony['saju']>();

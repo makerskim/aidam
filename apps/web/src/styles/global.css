@@ -3444,7 +3444,7 @@ img {
 
 .basis-presets {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 .bp-item {
@@ -3518,4 +3518,15 @@ img {
   line-height: 1.6;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+}
+
+.hanja-search {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.nc-dual {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-3);
 }

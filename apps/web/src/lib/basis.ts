@@ -68,12 +68,14 @@ export const PRESETS = {
   app: { yongsinMethod: 'lacking', soundSchool: 'unhae', finalConsonant: 'on', scoring: 'app', hanjaElement: 'radical' },
 } as const satisfies Record<string, Record<BasisKey, string>>;
 
-export const PRESET_LABEL = { classic: '정통 성명학', app: '실용 작명법' } as const;
+export const PRESET_LABEL = { classic: '정통 성명학', app: '실용 작명법', both: '두 기준 모두' } as const;
 /** 묶음 한 줄 설명 */
 export const PRESET_DESC = {
   classic: '억부·조후 용신 · 해례본 첫소리 · 뜻까지 보는 배점',
   app: '부족한 오행 용신 · 운해본 받침까지 · 수리 중심 배점',
+  both: '정통·실용 모두 좋은 이름 · 낮은 쪽 점수 순',
 } as const;
+export type PresetKey = keyof typeof PRESET_LABEL;
 
 export function basisValue(school: SchoolOptions, key: BasisKey): string {
   if (key === 'finalConsonant') return school.includeFinalConsonant ? 'on' : 'off';
@@ -87,17 +89,25 @@ export function withBasis(school: SchoolOptions, key: BasisKey, value: string): 
   return { ...school, [key]: value };
 }
 
+/** 항목을 직접 바꾸면 '두 기준 모두'는 풀린다 */
+export function withBasisItem(school: SchoolOptions, key: BasisKey, value: string): SchoolOptions {
+  return withBasis({ ...school, dual: false }, key, value);
+}
+
 /** 지금 기준이 어느 묶음과 같은지(둘 다 아니면 null) */
-export function presetOf(school: SchoolOptions): keyof typeof PRESETS | null {
+export function presetOf(school: SchoolOptions): PresetKey | null {
+  if (school.dual) return 'both';
   for (const k of Object.keys(PRESETS) as (keyof typeof PRESETS)[]) {
     if (BASIS_ITEMS.every((it) => basisValue(school, it.key) === PRESETS[k][it.key])) return k;
   }
   return null;
 }
 
-export function withPreset(school: SchoolOptions, k: keyof typeof PRESETS): SchoolOptions {
-  let out = { ...school };
-  for (const it of BASIS_ITEMS) out = withBasis(out, it.key, PRESETS[k][it.key]);
+export function withPreset(school: SchoolOptions, k: PresetKey): SchoolOptions {
+  // '두 기준 모두'는 추천만 두 기준으로 하고, 풀이는 정통 성명학 기준으로 보여 준다
+  let out: SchoolOptions = { ...school, dual: k === 'both' };
+  const values = PRESETS[k === 'both' ? 'classic' : k];
+  for (const it of BASIS_ITEMS) out = withBasis(out, it.key, values[it.key]);
   return out;
 }
 

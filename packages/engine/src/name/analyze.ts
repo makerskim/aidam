@@ -45,6 +45,8 @@ export interface SchoolOptions {
   hanjaElement?: 'radical' | 'meaning';
   /** 채점 방식(배점): 정통 성명학(기본) / 일반 작명앱. 영역별 만점은 PROFILE_MAX */
   scoring?: 'classic' | 'app';
+  /** 추천만: 정통 성명학과 실용 작명법 두 기준 모두에서 좋은 이름을 찾는다(채점은 각 기준으로 따로) */
+  dual?: boolean;
 }
 
 export const DEFAULT_SCHOOL_OPTIONS: SchoolOptions = {
