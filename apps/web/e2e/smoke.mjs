@@ -209,6 +209,10 @@ await page.click('.basis-top .seg button:has-text("실용 작명법")');
 await page.waitForSelector('.basis-top .seg button[aria-pressed="true"]:has-text("실용 작명법")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
 await page.waitForFunction((prev) => [...document.querySelectorAll('.name-card')].slice(0, 10).map((e) => e.innerText).join('|') !== prev, classicCards, { timeout: 40000 }).catch(() => assert.fail('정통·실용 작명법 기준 결과가 같음'));
+{
+  const scores = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-score b').allTextContents()).map(Number);
+  assert.deepEqual([...scores].sort((a, b) => b - a), scores, '실용 작명법: 점수 높은 순이 아님');
+}
 if (!(await page.locator('.basis-body').count())) await page.click('.basis-head');
 assert.equal(await page.locator('.basis-row').count(), 5, '세부 항목 5개(용신·발음오행·받침·배점·한자오행)');
 await page.click('.basis-row:has-text("발음오행") >> nth=0 >> .seg button:has-text("해례본")');
@@ -219,10 +223,11 @@ await page.click('.basis-top .seg button:has-text("두 기준 모두")');
 await page.waitForSelector('.name-card .nc-dual', { timeout: 40000 });
 {
   const scores = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-score b').allTextContents()).map(Number);
-  assert.deepEqual([...scores].sort((a, b) => b - a), scores, '두 기준 모두: 낮은 쪽 점수 순이 아님');
+  assert.deepEqual([...scores].sort((a, b) => b - a), scores, '두 기준 모두: 평균 점수 순이 아님');
   const dual = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-dual').first().textContent()) ?? '';
   const [c, p] = (dual.match(/\d+/g) ?? []).map(Number);
-  assert.equal(scores[0], Math.min(c ?? 0, p ?? 0), `큰 점수가 두 기준 중 낮은 쪽이 아님 (${dual})`);
+  assert.ok(Math.abs((scores[0] ?? 0) - ((c ?? 0) + (p ?? 0)) / 2) <= 1, `큰 점수가 두 기준 평균이 아님 (${dual})`);
+  assert.ok((c ?? 0) >= 70 && (p ?? 0) >= 70, `두 기준 중 낮은 이름이 있음 (${dual})`);
 }
 console.log('✓ 계산 기준 고르기(묶음·항목별·두 기준 모두)');
 

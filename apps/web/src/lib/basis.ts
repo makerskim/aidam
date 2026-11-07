@@ -73,7 +73,7 @@ export const PRESET_LABEL = { classic: '정통 성명학', app: '실용 작명�
 export const PRESET_DESC = {
   classic: '억부·조후 용신 · 해례본 첫소리 · 뜻까지 보는 배점',
   app: '부족한 오행 용신 · 운해본 받침까지 · 수리 중심 배점',
-  both: '정통·실용 모두 좋은 이름 · 낮은 쪽 점수 순',
+  both: '두 기준 모두 A등급 이상 · 평균 점수 높은 순',
 } as const;
 export type PresetKey = keyof typeof PRESET_LABEL;
 

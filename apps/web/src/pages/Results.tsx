@@ -14,8 +14,8 @@ import { BasisPicker } from '../components/basis';
 import { Disclaimer, ErrorText, Icon, Segmented, Staged } from '../components/ui';
 
 const PAGE = 30;
-/** 목록 점수: '두 기준 모두'면 두 기준 중 낮은 쪽 */
-const scoreOf = (r: Recommendation) => (r.dual ? Math.min(r.dual.classic.total, r.dual.practical.total) : r.report.score.total);
+/** 목록 점수: 정통·실용은 그 기준 점수, '두 기준 모두'는 두 점수의 평균 */
+const scoreOf = (r: Recommendation) => (r.dual ? (r.dual.classic.total + r.dual.practical.total) / 2 : r.report.score.total);
 const gradeFromTotal = (t: number) => (t >= 90 ? 'S' : t >= 80 ? 'A' : t >= 70 ? 'B' : t >= 60 ? 'C' : 'D');
 const STYLE_LABEL = { popular: '요즘 많이 쓰는', balanced: '무난한', unique: '흔하지 않은' } as const;
 
@@ -65,7 +65,7 @@ function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation;
   const query = to.split('?')[1] ?? '';
   const meaning = rec.report.chars.map((h, i) => (h ? hanjaMeaning(h, rec.report.input.given[i]?.hangul ?? '') : '')).join(' · ');
   const saved = lib.isBookmarked(rec.hanja, query);
-  // '두 기준 모두'면 두 기준 중 낮은 쪽 점수를 크게, 두 점수를 함께 보여 준다
+  // '두 기준 모두'면 두 점수의 평균을 크게, 기준별 점수·등급을 함께 보여 준다
   const total = Math.round(scoreOf(rec));
   const grade = rec.dual ? gradeFromTotal(scoreOf(rec)) : rec.report.score.grade;
   return (
@@ -81,7 +81,7 @@ function NameCard({ rec, to, rank, label, onOpen, pick }: { rec: Recommendation;
           <span className="nc-meaning">{meaning}</span>
           {rec.dual ? (
             <span className="nc-dual">
-              정통 {Math.round(rec.dual.classic.total)} · 실용 {Math.round(rec.dual.practical.total)}
+              정통 {Math.round(rec.dual.classic.total)}점 {rec.dual.classic.grade} · 실용 {Math.round(rec.dual.practical.total)}점 {rec.dual.practical.grade}
             </span>
           ) : null}
         </span>

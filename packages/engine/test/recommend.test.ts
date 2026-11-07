@@ -324,3 +324,17 @@ describe('이름 느낌: 느낌끼리 이름이 하나도 겹치지 않는다', 
     }
   }, 300000);
 });
+
+describe('기준별 점수 높은 순', () => {
+  it('정통·실용 각각 그 기준 점수가 높은 순이고, 상위 30개가 더 넓게 찾은 상위 30개와 같다(생일 있음·없음)', async () => {
+    const { CLASSIC_BASIS, PRACTICAL_BASIS } = await import('../src/recommend/recommend');
+    for (const sj of [saju, null]) for (const b of [CLASSIC_BASIS, PRACTICAL_BASIS]) for (const gender of ['female', 'male'] as const) {
+      const o = { ...DEFAULT_SCHOOL_OPTIONS, ...b };
+      const r = recommendNames({ ...base, gender, saju: sj, options: o, limit: 30 });
+      const t = r.map((x) => x.report.score.total);
+      expect([...t].sort((x, y) => y - x)).toEqual(t);
+      const wide = recommendNames({ ...base, gender, saju: sj, options: o, limit: 200 }).slice(0, 30).map((x) => x.report.score.total);
+      expect(t).toEqual(wide);
+    }
+  }, 120000);
+});

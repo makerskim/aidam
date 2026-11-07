@@ -351,7 +351,8 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
         if (strict && !suri.noBad) continue;
         // 용신·희신 기운의 한자가 하나도 없는 조합은 뺀다(돌림자 한자는 정해져 있으니 다른 글자로 채운다)
         if (needFavor && saju && !entries.some((h) => saju.roles[h.element] === 'yong' || saju.roles[h.element] === 'hui')) continue;
-        const resource = resourcePointsFor(entries, saju);
+        // 생일이 없으면 정식 채점도 한자오행을 빼므로 미리 고를 때도 0으로 둔다(순서가 정식 점수와 같게)
+        const resource = saju ? resourcePointsFor(entries, saju) : 0;
         const syy = strokeYinYang([...(surEntries as HanjaEntry[]).map((h) => h.strokes), ...strokes]).balanced ? 6 : 0;
         const bulyong = entries.some((h) => h.bulyong) ? 0 : 3;
         // 실용 점수의 이름 느낌 몫(3점)은 정식 분석과 똑같이 늘 만점으로 둔다. 배점은 정식 분석과 같게
@@ -389,7 +390,7 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
     const byHangul = new Map(kept.map((b) => [b.hangul, b]));
     const scored = kept.flatMap((b) => scoreHangul(b, strict, level < 3));
     scored.sort((a, b) => b.total - a.total || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja));
-    const out: Out[] = scored.slice(0, Math.max(limit * 2, 60)).map((s) => {
+    const out: Out[] = scored.slice(0, Math.max(limit * 3, 90)).map((s) => {
       const b = byHangul.get(s.hangul) as Base;
       return {
         hangul: `${surSyl.join('')}${s.hangul}`,
@@ -498,8 +499,9 @@ export const CLASSIC_BASIS: Partial<SchoolOptions> = { yongsinMethod: 'eokbu', s
 export const PRACTICAL_BASIS: Partial<SchoolOptions> = { yongsinMethod: 'lacking', soundSchool: 'unhae', includeFinalConsonant: true, scoring: 'app', hanjaElement: 'radical' };
 
 /**
- * 두 기준 모두에서 좋은 이름. 정통 성명학·실용 작명법으로 각각 후보를 찾아 합친 뒤,
- * 같은 이름을 두 기준으로 다시 채점해 '낮은 쪽 점수'가 높은 순으로 고른다(둘 다 좋은 이름이 앞에).
+ * 두 기준 모두에서 좋은 이름. 정통 성명학·실용 작명법으로 각각 후보를 찾아 합친 뒤 같은 이름을 두 기준으로 다시 채점한다.
+ * 1) 두 기준 모두 A등급(80점) 이상인 이름만(모자라면 두 기준 모두 B등급 70점 이상까지)
+ * 2) 두 점수의 평균이 높은 순(같으면 낮은 쪽 점수가 높은 순)
  * 보여 주는 풀이(report)는 정통 성명학 기준, 두 점수는 dual에 담는다.
  */
 export function recommendBoth(args: RecommendArgs): Recommendation[] {
@@ -513,9 +515,8 @@ export function recommendBoth(args: RecommendArgs): Recommendation[] {
     if (!pool.has(r.hanja)) pool.set(r.hanja, r);
   }
   const scored = [...pool.values()].map((r) => {
-    const input = r.report.input;
-    const a = analyzeName(input, args.saju, classic);
-    const b = analyzeName(input, args.saju, practical);
+    const a = analyzeName(r.report.input, args.saju, classic);
+    const b = analyzeName(r.report.input, args.saju, practical);
     return {
       ...r,
       report: a,
@@ -524,6 +525,15 @@ export function recommendBoth(args: RecommendArgs): Recommendation[] {
       avg: (a.score.total + b.score.total) / 2,
     };
   });
-  scored.sort((x, y) => y.low - x.low || y.avg - x.avg || cmpCodePoints(x.hangul, y.hangul) || cmpCodePoints(x.hanja, y.hanja));
-  return scored.slice(0, limit).map(({ low: _l, avg: _a, ...r }) => r);
+  const enough = Math.min(MIN_TOTAL, limit);
+  let kept = scored.filter((x) => x.low >= 80);
+  if (kept.length < enough) kept = scored.filter((x) => x.low >= 70);
+  if (kept.length < enough) kept = scored;
+  kept.sort((x, y) => y.avg - x.avg || y.low - x.low || cmpCodePoints(x.hangul, y.hangul) || cmpCodePoints(x.hanja, y.hanja));
+  return kept.slice(0, limit).map(({ low: _l, avg: _a, ...r }) => r);
+}
+
+/** '두 기준 모두' 목록 점수: 두 기준 점수의 평균 */
+export function dualScore(r: Recommendation): number {
+  return r.dual ? (r.dual.classic.total + r.dual.practical.total) / 2 : r.report.score.total;
 }

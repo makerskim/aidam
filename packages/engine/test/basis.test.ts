@@ -132,26 +132,20 @@ describe('이름 자료', () => {
 });
 
 describe('두 기준 모두 좋은 이름', () => {
-  it('두 기준 점수를 담고, 낮은 쪽 점수가 높은 순이며, 각 점수는 그 기준으로 직접 풀어 본 점수와 같다', async () => {
+  it('두 기준 모두 A등급 이상이고, 평균 점수 높은 순이며, 각 점수는 그 기준으로 직접 풀어 본 점수와 같다', async () => {
     const { recommendBoth, CLASSIC_BASIS, PRACTICAL_BASIS } = await import('../src/recommend/recommend');
     for (const gender of ['female', 'male'] as const) {
       const r = recommendBoth({ surname: [{ hangul: '김', hanja: '金' }], gender, saju, prefs: DEFAULT_PREFERENCES, options: { ...DEFAULT_SCHOOL_OPTIONS, dual: true }, limit: 40 });
-      expect(r.length).toBeGreaterThanOrEqual(30);
-      const lows = r.map((x) => Math.min(x.dual!.classic.total, x.dual!.practical.total));
-      expect([...lows].sort((a, b) => b - a)).toEqual(lows);
+      expect(r.length).toBeGreaterThanOrEqual(20);
+      const avgs = r.map((x) => (x.dual!.classic.total + x.dual!.practical.total) / 2);
+      expect([...avgs].sort((a, b) => b - a)).toEqual(avgs);
+      const floor = Math.min(...r.map((x) => Math.min(x.dual!.classic.total, x.dual!.practical.total)));
+      expect(floor).toBeGreaterThanOrEqual(70);
       for (const x of r.slice(0, 10)) {
         const input = x.report.input;
         expect(analyzeName(input, saju, { ...DEFAULT_SCHOOL_OPTIONS, ...CLASSIC_BASIS }).score.total).toBe(x.dual!.classic.total);
         expect(analyzeName(input, saju, { ...DEFAULT_SCHOOL_OPTIONS, ...PRACTICAL_BASIS }).score.total).toBe(x.dual!.practical.total);
       }
-      // 두 기준 모두 좋은 이름이 앞에: 1위의 낮은 쪽 점수는 정통·실용 각각 1위의 낮은 쪽 점수보다 낮지 않다
-      const top = (opts: object) => {
-        const one = recommendNames({ surname: [{ hangul: '김', hanja: '金' }], gender, saju, prefs: DEFAULT_PREFERENCES, options: { ...DEFAULT_SCHOOL_OPTIONS, ...opts } as never, limit: 1 })[0]!;
-        const a = analyzeName(one.report.input, saju, { ...DEFAULT_SCHOOL_OPTIONS, ...CLASSIC_BASIS }).score.total;
-        const b = analyzeName(one.report.input, saju, { ...DEFAULT_SCHOOL_OPTIONS, ...PRACTICAL_BASIS }).score.total;
-        return Math.min(a, b);
-      };
-      expect(lows[0]!).toBeGreaterThanOrEqual(Math.max(top(CLASSIC_BASIS), top(PRACTICAL_BASIS)));
     }
   });
 });
