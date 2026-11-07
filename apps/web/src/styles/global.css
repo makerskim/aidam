@@ -2034,22 +2034,7 @@ img {
   gap: 8px;
   min-width: 150px;
 }
-.why-diff {
-  padding: 18px 22px;
-}
-.why-diff summary {
-  cursor: pointer;
-  font-weight: 800;
-  color: var(--ink);
-}
-.why-diff ul {
-  margin-top: 12px;
-}
 .about-panel b,
-.why-diff b {
-  color: var(--ink);
-  font-weight: 800;
-}
 .verdict-line {
   font-size: 15px;
   font-weight: 800;
@@ -3474,51 +3459,6 @@ img {
   box-shadow: 0 0 0 1px var(--ink);
 }
 
-/* 계산 과정 */
-.trace-head {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  border: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
-}
-.trace-head .small {
-  flex: 1;
-}
-.trace.open .trace-head svg {
-  transform: rotate(180deg);
-}
-.trace-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.trace-steps li {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding-left: 12px;
-  border-left: 3px solid var(--line);
-}
-.trace-steps b {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--ink);
-}
-.trace-steps span {
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
 
 .hanja-search {
   min-height: 44px;
@@ -3529,4 +3469,27 @@ img {
   font-size: 12.5px;
   font-weight: 700;
   color: var(--text-3);
+}
+
+.basis-top {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 6px;
+}
+.basis-desc {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.basis .basis-head {
+  min-height: 40px;
+  padding: 4px 16px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  justify-content: flex-start;
+  gap: 4px;
+}
+.basis .basis-head[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }

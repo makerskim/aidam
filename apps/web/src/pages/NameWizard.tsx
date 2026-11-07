@@ -7,6 +7,7 @@ import { useGate } from '../lib/gate';
 import { useLibrary } from '../lib/library';
 import { useSettings } from '../lib/settings';
 import { useStoredState } from '../lib/storage';
+import { PRESET_DESC, PRESET_LABEL, presetOf, withPreset, type PresetKey } from '../lib/basis';
 import { DEFAULT_PREFS, fromSearch, KID_LABELS, MAX_KIDS, STATE_VERSION, toQuery, type AnalyzeState, type NameState, type SurnameSel } from '../lib/state';
 
 type StepKey = 'surname' | 'purpose' | 'given' | 'count' | 'gender' | 'birth' | 'prefs';
@@ -38,6 +39,8 @@ interface Draft {
   fixedHangul: string;
   fixedHanja: string | null;
   fixedPos: number;
+  /** 계산 기준: 정통 성명학 / 실용 작명법 / 두 기준 모두 */
+  basis?: PresetKey;
 }
 
 const kid = (): Kid => ({ gender: 'female', time: '', timeKnown: true });
@@ -76,6 +79,7 @@ function fromState(s: NameState): Draft {
     fixedHangul: s.prefs.fixed?.hangul ?? '',
     fixedHanja: s.prefs.fixed?.hanja ?? null,
     fixedPos: s.prefs.fixed?.position ?? 1,
+    basis: presetOf(s.school) ?? 'classic',
   };
 }
 
@@ -162,7 +166,7 @@ export function NameWizard() {
       gender: multi ? (kids[0]?.gender ?? 'unknown') : draft.gender,
       birth: birthResult.birth,
       prefs,
-      school: settings.school,
+      school: withPreset(settings.school, draft.basis ?? 'classic'),
       sajuOpts: settings.sajuOpts,
       ...(multi
         ? {
@@ -390,6 +394,15 @@ export function NameWizard() {
 
         {draft.step === 'prefs' ? (
           <div className="stack" style={{ gap: 26 }}>
+            <Field label="계산 기준">
+              <Segmented
+                label="계산 기준"
+                value={draft.basis ?? 'classic'}
+                options={(Object.keys(PRESET_LABEL) as PresetKey[]).map((k) => ({ value: k, label: PRESET_LABEL[k] }))}
+                onChange={(basis) => setDraft({ basis })}
+              />
+              <p className="small muted" style={{ marginTop: 6 }}>{PRESET_DESC[draft.basis ?? 'classic']}</p>
+            </Field>
             <Field label="글자 수">
               <Segmented
                 label="글자 수"

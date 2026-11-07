@@ -118,10 +118,6 @@ export function fitsGender(hangul: string, gender: Gender): boolean {
   return !MASCULINE_LAST.has(last) && !(MAIN.male.has(hangul) && !listed('female').has(hangul));
 }
 
-/** 남녀 모두 쓰는 이름(성별을 모를 때 먼저 고른다) */
-function isUnisex(hangul: string): boolean {
-  return listed('male').has(hangul) && listed('female').has(hangul);
-}
 
 /** 실제로 많이 쓰는 이름 목록(성별 모름이면 둘 다) */
 function knownNames(gender: Gender): Set<string> {
@@ -136,10 +132,18 @@ function knownNames(gender: Gender): Set<string> {
  * - 흔하지 않은: 개성 있는 이름 → 오래 써 온 이름 → 요즘 인기 이름
  */
 function styleTier(hangul: string, gender: Gender, style: Preferences['style']): number {
-  if ([...hangul].length < 2) return 0;
-  // 성별을 모르면 남녀 모두 쓰는 이름을 먼저(그 안에서 느낌대로)
-  if (gender === 'unknown' && !isUnisex(hangul)) return 3 + styleTierOf(hangul, gender, style);
+  if ([...hangul].length < 2) return singleTier(hangul, gender, style);
   return styleTierOf(hangul, gender, style);
+}
+
+/** 외자도 느낌별로 나눈다(요즘 많이 쓰는 / 오래 써 온 / 흔하지 않은) */
+const SINGLE_STYLE: Record<'female' | 'male', Record<Preferences['style'], string>> = {
+  female: { popular: '윤율린은', balanced: '현진민연정혜', unique: '솔별설담단슬빈결온' },
+  male: { popular: '준윤율건혁', balanced: '현진민훈석호원찬범환한', unique: '결온솔담겸산강웅' },
+};
+function singleTier(syl: string, gender: Gender, style: Preferences['style']): number {
+  const gs = gender === 'unknown' ? (['female', 'male'] as const) : ([gender] as const);
+  return gs.some((g) => SINGLE_STYLE[g][style].includes(syl)) ? 0 : 1;
 }
 
 function styleTierOf(hangul: string, gender: Gender, style: Preferences['style']): number {
@@ -159,10 +163,11 @@ function styleTierOf(hangul: string, gender: Gender, style: Preferences['style']
 type Level = 0 | 1 | 2 | 3 | 4;
 
 /** 어색한 조합 거르기. 낱말처럼 들리는 이름(하지·지하·이유·유린…)은 어느 단계에서도 뺀다 */
-function allowedAt(level: Level, weights: number[], hangul: string, known: Set<string>, tier: number): boolean {
+function allowedAt(level: Level, weights: number[], hangul: string, known: Set<string>, tier: number, styleStrict = false): boolean {
   if (AWKWARD_NAMES.has(hangul)) return false;
-  if (weights.length < 2) return true;
-  if (known.has(hangul)) return level >= 1 || tier === 0;
+  // 외자와 실제 이름은 고른 느낌(tier 0)만, 넓히는 단계(level 1 이상)에서도 styleStrict면 그대로
+  if (weights.length < 2) return tier === 0 || (level >= 1 && !styleStrict);
+  if (known.has(hangul)) return tier === 0 || (level >= 1 && !styleStrict);
   const sum = weights.reduce((a, b) => a + b, 0);
   return (level >= 2 && sum >= 5) || (level >= 3 && sum >= 3);
 }
@@ -223,7 +228,7 @@ function hanjaCandidates(syllable: string, position: number, saju: SajuAnalysis 
  * 1) 음절 조합 → 소리 규칙으로 한글 이름 상위 1,500개  2) 음절별 한자 상위 12개
  * 3) 4격·채점 → 한글 이름당 상위 2개 조합  4) 상위 후보를 정식 분석(analyzeName)으로 확정
  * 고른 이름 느낌의 실제 이름부터 찾고, 좋은 이름이 모자라면 한 단계씩 넓힌다(Level).
- * 순서: 점수 높은 순. 고른 느낌의 이름이 30개 이상이면 그 이름만 낸다.
+ * 순서: 점수 높은 순. 고른 이름 느낌의 이름만 낸다(모자라면 같은 느낌 안에서만 넓힘).
  */
 export function recommendNames(args: RecommendArgs): Recommendation[] {
   const { surname, gender, prefs, options } = args;
@@ -376,10 +381,10 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
   };
 
   type Out = Recommendation & { pref: number; tier: number };
-  const run = (level: Level): { out: Out[]; size: number } => {
-    const strict = options.strictMode && level < 4;
+  const run = (level: Level, opt: { noStrict?: boolean; styleStrict?: boolean } = {}): { out: Out[]; size: number } => {
+    const strict = options.strictMode && level < 4 && !opt.noStrict;
     const kept = bases
-      .filter((b) => !(strict && b.clash) && allowedAt(level, b.weights, b.hangul, known, b.tier))
+      .filter((b) => !(strict && b.clash) && allowedAt(level, b.weights, b.hangul, known, b.tier, opt.styleStrict))
       .slice(0, HANGUL_KEEP);
     const byHangul = new Map(kept.map((b) => [b.hangul, b]));
     const scored = kept.flatMap((b) => scoreHangul(b, strict, level < 3));
@@ -415,24 +420,30 @@ export function recommendNames(args: RecommendArgs): Recommendation[] {
 
   const sCount = (rs: Out[]) => new Set(rs.filter((r) => r.report.score.grade === 'S').map((r) => r.hangul)).size;
   const enough = Math.min(MIN_TOTAL, limit);
-  let last: Out[] = [];
-  for (const level of [0, 1, 2, 3] as const) {
+  const byScore = (a: Out, b: Out) => b.report.score.total - a.report.score.total || a.tier - b.tier || cmpCodePoints(a.hangul, b.hangul) || cmpCodePoints(a.hanja, b.hanja);
+  const merge = (a: Out[], b: Out[]) => {
+    const seen = new Set(a.map((r) => r.hanja));
+    return [...a, ...b.filter((r) => !seen.has(r.hanja))].sort(byScore).slice(0, limit);
+  };
+
+  // 1) 고른 이름 느낌의 이름만 쓴다(다른 느낌의 이름은 섞지 않는다 → 느낌마다 결과가 다르다).
+  //    모자라면 같은 느낌 안에서만 넓힌다: 아쉬운 점이 조금 있는 이름 → (흔하지 않은 이름만) 새 음절 조합
+  let styled = run(0).out;
+  if (styled.length < enough && options.strictMode) styled = merge(styled, run(0, { noStrict: true }).out);
+  if (styled.length < enough && prefs.style === 'unique' && pools.length === 2) styled = merge(styled, run(2, { styleStrict: true }).out);
+  // 돌림자가 있으면 그 글자가 든 이름만 되므로 느낌에 맞는 이름이 모자라면 다른 이름으로도 채운다(느낌 맞는 이름이 앞)
+  if (styled.length > 0 && !(prefs.fixed && styled.length < enough)) return strip(styled);
+
+  // 2) 고른 느낌의 이름이 없을 때만(돌림자·외자 조건 등) 실제 이름 전체 → 음절 조합 → 엄격 모드 해제 순으로 넓힌다
+  let last: Out[] = styled;
+  for (const level of [1, 2, 3] as const) {
     const { out, size } = run(level);
-    last = out;
-    if (level > 0 && out.length < enough) continue;
-    // 고른 느낌의 이름만으로 충분하면(STYLE_ENOUGH개 이상) 그 이름만 보여 준다(느낌마다 결과가 확실히 다르게)
-    if (level === 0 && out.length >= Math.min(STYLE_ENOUGH, limit)) return strip(out);
-    if (level === 0) continue;
+    last = merge(styled, out);
+    if (last.length < enough) continue;
     // 돌림자 등으로 실제 이름 후보가 너무 적으면(40개 미만) 흔한 음절 조합까지 본다
-    if (level >= 1 && sCount(out) > 0 && (level >= 2 || size >= 40)) return strip(out);
+    if (sCount(last) > 0 && (level >= 2 || size >= 40)) return strip(last);
   }
-  // 넓혀도 모자라면 '아쉬운 이름 미리 빼기'를 풀어 찾은 이름을 뒤에 붙인다(조건을 지킨 이름이 먼저)
-  if (last.length < enough && options.strictMode) {
-    const seen = new Set(last.map((r) => r.hanja));
-    last = [...last, ...run(4).out.filter((r) => !seen.has(r.hanja))]
-      .sort((a, b) => b.report.score.total - a.report.score.total || a.tier - b.tier || cmpCodePoints(a.hanja, b.hanja))
-      .slice(0, limit);
-  }
+  if (last.length < enough && options.strictMode) last = merge(last, run(4).out);
   return strip(last);
 }
 

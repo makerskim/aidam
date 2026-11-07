@@ -8,26 +8,23 @@ export function BasisPicker({ school, onChange }: { school: SchoolOptions; onCha
   const [open, setOpen] = useState(false);
   const preset = presetOf(school);
   return (
-    <section className={`basis ${open ? 'open' : ''}`} aria-label="계산 기준">
-      <button type="button" className="basis-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <section className="basis" aria-label="계산 기준">
+      <div className="basis-top">
         <span className="basis-label">계산 기준</span>
-        <b>{basisSummary(school)}</b>
-        <span className="basis-change">
-          바꾸기 <span className="cr-chev">{Icon.down}</span>
-        </span>
+        <Segmented
+          label="계산 기준"
+          value={preset ?? ''}
+          options={(Object.keys(PRESET_LABEL) as PresetKey[]).map((k) => ({ value: k, label: PRESET_LABEL[k] }))}
+          onChange={(k) => onChange(withPreset(school, k as PresetKey))}
+        />
+        <p className="basis-desc">{preset ? PRESET_DESC[preset] : `직접 고른 기준: ${basisSummary(school)}`}</p>
+      </div>
+      <button type="button" className="basis-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span>세부 항목 바꾸기</span>
+        <span className="cr-chev">{Icon.down}</span>
       </button>
       {open ? (
         <div className="basis-body">
-          <div className="basis-presets">
-            {(Object.keys(PRESET_LABEL) as PresetKey[]).map((k) => (
-              <button key={k} type="button" className="bp-item" aria-pressed={preset === k} onClick={() => onChange(withPreset(school, k))}>
-                <b>{PRESET_LABEL[k]}</b>
-                {PRESET_DESC[k].split(' · ').map((part) => (
-                  <span key={part}>{part}</span>
-                ))}
-              </button>
-            ))}
-          </div>
           {BASIS_ITEMS.map((it) => (
             <div key={it.key} className="basis-row">
               <div>

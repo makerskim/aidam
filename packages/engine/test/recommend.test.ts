@@ -295,8 +295,8 @@ describe('오류 시뮬레이션: 여러 사주·성씨·성별·느낌·기준'
   });
   it('정통 성명학과 일반 작명앱 기준의 상위 20개 이름이 거의 겹치지 않는다', () => {
     for (const sj of sajus.slice(0, 6)) for (const gender of ['female', 'male'] as const) {
-      const a = new Set(recommendNames({ ...base, gender, saju: sj, limit: 40 }).slice(0, 20).map((x) => x.hangul));
-      const b = recommendNames({ ...base, gender, saju: sj, options: APP as never, limit: 40 }).slice(0, 20).map((x) => x.hangul);
+      const a = new Set(recommendNames({ ...base, gender, saju: sj, limit: 40 }).slice(0, 20).map((x) => x.hanja));
+      const b = recommendNames({ ...base, gender, saju: sj, options: APP as never, limit: 40 }).slice(0, 20).map((x) => x.hanja);
       expect(b.filter((x) => a.has(x)).length).toBeLessThanOrEqual(4);
     }
   });
@@ -306,4 +306,21 @@ describe('오류 시뮬레이션: 여러 사주·성씨·성별·느낌·기준'
       for (const x of recommendNames({ ...base, gender, saju: sj, prefs: { ...DEFAULT_PREFERENCES, length: 1 }, limit: 30 })) expect(allowed.has(x.hangul.slice(1)), x.hangul).toBe(true);
     }
   });
+});
+
+describe('이름 느낌: 느낌끼리 이름이 하나도 겹치지 않는다', () => {
+  const PRACTICAL = { ...DEFAULT_SCHOOL_OPTIONS, yongsinMethod: 'lacking', soundSchool: 'unhae', scoring: 'app', includeFinalConsonant: true } as const;
+  const sajus = Array.from({ length: 6 }, (_, k) =>
+    analyzePillars({ year: { stem: k % 10, branch: (k * 5) % 12 }, month: { stem: (k * 3) % 10, branch: (k * 7 + 2) % 12 }, day: { stem: (k * 7) % 10, branch: (k * 11) % 12 }, hour: { stem: (k * 9) % 10, branch: (k + 4) % 12 } } as never),
+  );
+  it('두 글자·외자, 남·여·모름, 정통·실용·두 기준 모두에서 전체 목록이 서로 다르다', async () => {
+    const { recommendBoth } = await import('../src/recommend/recommend');
+    for (const sj of sajus) for (const gender of ['female', 'male', 'unknown'] as const) for (const length of [2, 1] as const) for (const [o, fn] of [[DEFAULT_SCHOOL_OPTIONS, recommendNames], [PRACTICAL, recommendNames], [{ ...DEFAULT_SCHOOL_OPTIONS, dual: true }, recommendBoth]] as const) {
+      const L = (['popular', 'balanced', 'unique'] as const).map((style) => new Set((fn as typeof recommendNames)({ ...base, gender, saju: sj, prefs: { ...DEFAULT_PREFERENCES, style, length }, options: o as never, limit: 100 }).map((x) => x.hangul)));
+      for (const [a, b] of [[0, 1], [0, 2], [1, 2]] as const) {
+        const shared = [...L[a]!].filter((x) => L[b]!.has(x));
+        expect(shared, `${gender} ${length} ${JSON.stringify(o)}`).toEqual([]);
+      }
+    }
+  }, 300000);
 });

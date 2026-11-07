@@ -109,10 +109,9 @@ assert.ok(await page.locator('.report .saju-panel').count(), '리포트에 만�
 assert.ok(await page.locator('.topbar >> text=한자 바꿔 보기').count(), '맨 위 한자 바꿔 보기 없음');
 assert.ok(await page.locator('.summary .hl-col').count(), '총평 없음');
 assert.equal(await page.locator('.basis-compare .bc-item').count(), 2, '두 기준 점수 비교 없음');
-await page.click('.trace-head');
-assert.ok((await page.locator('.trace-steps li').count()) >= 8, '계산 과정 단계가 모자람');
-assert.ok(await page.locator('.trace-steps li:has-text("합계")').count(), '계산 과정 합계 없음');
-assert.ok(await page.locator('.basis-head:has-text("정통 성명학")').count(), '계산 기준 표시 없음');
+assert.equal(await page.locator('text=계산 과정').count(), 0, '계산 과정이 남아 있음');
+assert.equal(await page.locator('text=다른 작명 서비스와 점수가 다른가요').count(), 0, '다른 서비스 설명이 남아 있음');
+assert.ok(await page.locator('.basis-top .seg button[aria-pressed="true"]:has-text("정통 성명학")').count(), '계산 기준 표시 없음');
 {
   const body = (await page.locator('.summary-body').first().textContent()) ?? '';
   assert.ok(/바라는|바람/.test(body), `총평에 이름의 바람이 없음: ${body.slice(0, 60)}`);
@@ -205,20 +204,18 @@ console.log('✓ 쌍둥이(세트 / 아이마다 따로)');
 
 // 8a) 계산 기준 바꾸기: 정통 성명학 → 실용 작명법 (다시 계산하고 기준이 바뀐다)
 const classicCards = (await page.locator('.name-card').allInnerTexts()).slice(0, 10).join('|');
-await page.click('.basis-head');
-assert.equal(await page.locator('.basis-row').count(), 5, '계산 기준 항목 5개(용신·발음오행·받침·배점·한자오행)');
-await page.click('.basis-body .bp-item:has-text("실용 작명법")');
-await page.waitForSelector('.basis-head:has-text("실용 작명법")', { timeout: 10000 });
+assert.equal(await page.locator('.basis-top .seg button').count(), 3, '계산 기준 세 가지(정통·실용·두 기준 모두)가 보이지 않음');
+await page.click('.basis-top .seg button:has-text("실용 작명법")');
+await page.waitForSelector('.basis-top .seg button[aria-pressed="true"]:has-text("실용 작명법")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
 await page.waitForFunction((prev) => [...document.querySelectorAll('.name-card')].slice(0, 10).map((e) => e.innerText).join('|') !== prev, classicCards, { timeout: 40000 }).catch(() => assert.fail('정통·실용 작명법 기준 결과가 같음'));
-if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
-await page.click('.basis-row:has-text("발음오행") .seg button:has-text("해례본")');
-await page.waitForSelector('.basis-head:has-text("부족한 오행 · 해례본")', { timeout: 10000 });
+if (!(await page.locator('.basis-body').count())) await page.click('.basis-head');
+assert.equal(await page.locator('.basis-row').count(), 5, '세부 항목 5개(용신·발음오행·받침·배점·한자오행)');
+await page.click('.basis-row:has-text("발음오행") >> nth=0 >> .seg button:has-text("해례본")');
+await page.waitForSelector('.basis-desc:has-text("부족한 오행 · 해례본")', { timeout: 10000 });
 await page.waitForSelector('.name-card', { timeout: 40000 });
 // 두 기준 모두 좋은 이름
-if (!(await page.locator('.basis.open').count())) await page.click('.basis-head');
-await page.click('.basis-body .bp-item:has-text("두 기준 모두")');
-await page.waitForSelector('.basis-head:has-text("두 기준 모두")', { timeout: 10000 });
+await page.click('.basis-top .seg button:has-text("두 기준 모두")');
 await page.waitForSelector('.name-card .nc-dual', { timeout: 40000 });
 {
   const scores = (await page.locator('section[aria-label="추천 이름"] .name-card .nc-score b').allTextContents()).map(Number);
@@ -259,12 +256,12 @@ const uniqueNames = await single('흔하지 않은');
 {
   const a = new Set(popularNames.slice(0, 20));
   const overlap = uniqueNames.slice(0, 20).filter((n) => a.has(n)).length;
-  assert.ok(overlap <= 2, `요즘 많이 쓰는·흔하지 않은 상위 20개가 ${overlap}개 겹침`);
+  assert.equal(overlap, 0, `요즘 많이 쓰는·흔하지 않은 상위 20개가 ${overlap}개 겹침`);
 }
 const balancedNames = await single('무난한');
 assert.notEqual(popularNames[0], uniqueNames[0], '이름 느낌을 바꿔도 첫 이름이 같음');
 assert.notEqual(popularNames[0], balancedNames[0], '요즘 많이 쓰는·무난한 첫 이름이 같음');
-assert.ok(balancedNames.slice(0, 20).filter((n) => popularNames.slice(0, 20).includes(n)).length <= 2, '요즘 많이 쓰는·무난한이 많이 겹침');
+assert.equal(balancedNames.filter((n) => popularNames.includes(n)).length, 0, '요즘 많이 쓰는·무난한이 겹침');
 const fixedNames = await single('무난한', ['희', '熙']);
 // 남자아이 이름에 여자 이름처럼 들리는 끝소리가 없어야 한다(성별 확인은 엔진 시뮬레이션 테스트에서 폭넓게)
 assert.ok(fixedNames.length > 0, '돌림자를 걸면 추천이 비어 있음');
