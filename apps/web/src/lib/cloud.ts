@@ -95,3 +95,10 @@ export async function removeEntry(uid: string, id: string): Promise<void> {
   const { f, db } = await loadStore();
   await f.deleteDoc(f.doc(col(f, db, uid), id));
 }
+
+/** 서버(결제·AI)에 보낼 로그인 토큰. 로그인하지 않았으면 null */
+export async function getIdToken(): Promise<string | null> {
+  if (!cloudConfigured) return null;
+  const { auth } = await loadAuth();
+  return auth.currentUser ? auth.currentUser.getIdToken() : null;
+}

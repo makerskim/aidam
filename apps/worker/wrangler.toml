@@ -1,0 +1,32 @@
+# 아이담 서버 + 사이트(Cloudflare Workers, 무료 요금제로 충분).
+# 배포는 GitHub Actions(.github/workflows/cloudflare.yml)가 한다. 직접 할 때: pnpm -C apps/worker deploy
+name = "aidam"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# 사이트 파일(먼저 pnpm build로 만든다). /api/* 만 Worker 코드가 처리한다.
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# 이용권·주문·AI 캐시. id는 배포 워크플로가 자동으로 만들어 채운다.
+[[kv_namespaces]]
+binding = "KV"
+id = "KV_NAMESPACE_ID"
+
+[vars]
+FIREBASE_PROJECT_ID = "aidam-9aba3"
+# 결제 없이 쓰는 관리자(쉼표로 여러 명). 이메일 인증된 Google 계정만 인정한다.
+ADMIN_EMAILS = "makerskim@gmail.com"
+PRICE_KRW = "9900"
+PASS_DAYS = "30"
+ORDER_NAME = "아이담 30일 이용권"
+AI_DAILY_LIMIT = "20"
+AI_ADMIN_DAILY_LIMIT = "100"
+AI_GLOBAL_DAILY_LIMIT = "200"
+AI_MODEL = "claude-opus-5-5"
+
+# 비밀값(코드·저장소에 넣지 않는다): TOSS_SECRET_KEY, ANTHROPIC_API_KEY
+# GitHub 저장소 Settings → Secrets에 넣으면 배포 때 자동으로 올라간다.

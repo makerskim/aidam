@@ -1,0 +1,74 @@
+# Cloudflare 배포: main에 올리면 테스트 → 사이트 빌드 → 서버(결제·AI)와 사이트를 한 번에 배포한다.
+# 주소: https://aidam.<내 계정 이름>.workers.dev (Cloudflare 무료 요금제)
+#
+# 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다.
+#   Variables: CLOUDFLARE_ACCOUNT_ID, TOSS_CLIENT_KEY(토스 클라이언트 키, 공개돼도 되는 값)
+#   Secrets:   CLOUDFLARE_API_TOKEN, TOSS_SECRET_KEY, ANTHROPIC_API_KEY
+# CLOUDFLARE_ACCOUNT_ID가 없으면 이 작업은 건너뛴다.
+name: Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.CLOUDFLARE_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - name: 사이트 빌드(결제·AI 켜기)
+        run: pnpm build
+        env:
+          VITE_API_BASE: /api
+          VITE_TOSS_CLIENT_KEY: ${{ vars.TOSS_CLIENT_KEY }}
+      - run: pnpm budget
+
+      - name: KV 저장소 준비(없으면 만든다)
+        working-directory: apps/worker
+        run: |
+          find_id() {
+            npx wrangler kv namespace list 2>/dev/null | node -e '
+              let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+                const list = JSON.parse(s.slice(s.indexOf("[")));
+                const hit = list.find((n) => /(^|-)aidam-kv$/.test(n.title));
+                process.stdout.write(hit ? hit.id : "");
+              });'
+          }
+          ID=$(find_id)
+          if [ -z "$ID" ]; then
+            npx wrangler kv namespace create aidam-kv
+            ID=$(find_id)
+          fi
+          if [ -z "$ID" ]; then echo "KV 저장소를 만들지 못했어요"; exit 1; fi
+          sed -i "s/KV_NAMESPACE_ID/$ID/" wrangler.toml
+
+      - name: 배포
+        working-directory: apps/worker
+        run: npx wrangler deploy
+
+      - name: 비밀값 올리기(넣어 둔 것만)
+        working-directory: apps/worker
+        env:
+          TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for NAME in TOSS_SECRET_KEY ANTHROPIC_API_KEY; do
+            VALUE="${!NAME}"
+            if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | npx wrangler secret put "$NAME"; fi
+          done

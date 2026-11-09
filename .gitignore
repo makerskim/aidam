@@ -4,3 +4,5 @@ dist/
 *.log
 coverage/
 dist-preview/
+dist-pay/
+.wrangler/

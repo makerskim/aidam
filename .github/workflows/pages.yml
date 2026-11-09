@@ -1,6 +1,8 @@
 # GitHub Pages 배포: main에 올리면 테스트 → 빌드 → https://makerskim.github.io/aidam/ 에 배포한다.
 # 공개 저장소라면 GitHub Actions와 Pages 모두 무료다.
 # 처음 한 번만 저장소 Settings → Pages → Source를 "GitHub Actions"로 바꿔야 한다.
+# 저장소를 비공개로 바꾸면 이 배포는 건너뛰고, Cloudflare 배포(cloudflare.yml)를 쓴다.
+# 이 배포본은 결제·AI 없이 모두 열린 상태다.
 name: Pages
 
 on:
@@ -19,6 +21,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

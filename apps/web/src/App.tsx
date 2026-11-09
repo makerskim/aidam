@@ -10,6 +10,9 @@ import { SettingsPage } from './pages/Settings';
 import { SajuPage } from './pages/Saju';
 import { LibraryProvider, useLibrary } from './lib/library';
 import { GateProvider, useGate } from './lib/gate';
+import { AccessProvider, dateKo, useAccess } from './lib/access';
+import { PayDone, PayPage } from './pages/Pay';
+import { BUSINESS } from './business';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
@@ -44,6 +47,7 @@ function ScrollTop() {
 
 function AccountMenu() {
   const lib = useLibrary();
+  const access = useAccess();
   const gate = useGate();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -79,9 +83,17 @@ function AccountMenu() {
       {open ? (
         <div className="menu" role="menu">
           <div className="menu-head">
-            <b>{lib.user.name ?? 'Google 계정'}</b>
+            <b>
+              {lib.user.name ?? 'Google 계정'}
+              {access.admin ? <span className="chip chip-primary admin-chip">관리자</span> : null}
+            </b>
             <span className="tiny muted">{lib.user.email ?? (lib.isPreview ? '이 기기에만 저장돼요' : '')}</span>
           </div>
+          {access.enabled ? (
+            <button type="button" role="menuitem" onClick={() => go('/pay')}>
+              {access.admin ? '이용권 (관리자 무료)' : access.paid && access.until ? `이용권 · ${dateKo(access.until)}까지` : '이용권'}
+            </button>
+          ) : null}
           <button type="button" role="menuitem" onClick={() => go('/me?tab=saved')}>
             저장한 이름
           </button>
@@ -134,9 +146,9 @@ function Header() {
 export function AboutPanel() {
   return (
     <div className="about-panel" id="about">
-      <h3>AI가 아니라 정해진 규칙으로 계산해요</h3>
+      <h3>점수는 정해진 규칙으로 계산해요</h3>
       <p>
-        AI를 쓰지 않아요. 전통 성명학의 규칙을 그대로 옮긴 계산식으로, 이용자의 브라우저 안에서 계산해요. 그래서 같은 정보를 넣으면 <b>언제나 같은 결과</b>가 나와요.
+        점수와 등급은 전통 성명학의 규칙을 그대로 옮긴 계산식으로, 이용자의 브라우저 안에서 계산해요. 그래서 같은 정보를 넣으면 <b>언제나 같은 결과</b>가 나와요. 이용권의 <b>AI 풀이</b>는 이 계산 결과를 Claude(Anthropic)가 자연스러운 글로 풀어 쓴 것이에요.
       </p>
       <h3>이름을 고르는 순서</h3>
       <ol className="stack" style={{ margin: 0, paddingLeft: 20, gap: 4 }}>
@@ -169,10 +181,26 @@ function Footer() {
           작명 원리와 출처 {open ? '닫기' : '보기'}
         </button>
         {open ? <AboutPanel /> : null}
+        <BusinessInfo />
         <span className="made-by">Made by makerskim</span>
       </div>
     </footer>
   );
+}
+
+/** 토스 결제창에서 돌아오면(?pay=...) 결제 확인 화면으로 보낸다 */
+function PayReturn() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('pay')) navigate('/pay/done', { replace: true });
+  }, [navigate]);
+  return null;
+}
+
+function BusinessInfo() {
+  const b = BUSINESS;
+  const parts = [b.name && `상호 ${b.name}`, b.owner && `대표 ${b.owner}`, b.regNo && `사업자등록번호 ${b.regNo}`, b.mailOrderNo && `통신판매업 ${b.mailOrderNo}`, b.address, b.phone, b.email].filter(Boolean);
+  return parts.length ? <p className="tiny muted biz-info">{parts.join(' · ')}</p> : null;
 }
 
 function RequireUser({ children }: { children: ReactNode }) {
@@ -205,6 +233,8 @@ function Shell() {
           <Route path="/self" element={<SelfAnalyze />} />
           <Route path="/me" element={<RequireUser><MyNames /></RequireUser>} />
           <Route path="/settings" element={<RequireUser><SettingsPage /></RequireUser>} />
+          <Route path="/pay" element={<PayPage />} />
+          <Route path="/pay/done" element={<PayDone />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </ErrorBoundary>
@@ -217,9 +247,12 @@ export function App() {
   return (
     <HashRouter>
       <LibraryProvider>
-        <GateProvider>
-          <Shell />
-        </GateProvider>
+        <AccessProvider>
+          <GateProvider>
+            <PayReturn />
+            <Shell />
+          </GateProvider>
+        </AccessProvider>
       </LibraryProvider>
     </HashRouter>
   );

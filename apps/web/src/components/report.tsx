@@ -12,6 +12,9 @@ import { useGate } from '../lib/gate';
 import { useCountUp } from '../lib/motion';
 import { DEFAULT_PREFS, fromSearch, STATE_VERSION, toQuery, type AnalyzeState, type NameState } from '../lib/state';
 import { Icon } from './ui';
+import { useAccess } from '../lib/access';
+import { Paywall } from './paywall';
+import { AiSection, aiSummary } from './ai';
 
 export function NameHero({ report }: { report: NameReport }) {
   const sur = report.input.surname.map((c, i) => ({ c, h: report.surnameChars[i] ?? null, sur: true }));
@@ -399,6 +402,7 @@ export function ReportView({
   const criteria = explainCriteria(report, a);
   const hl = nameHighlights(criteria);
   const { record } = lib;
+  const access = useAccess();
 
   // 로그인했다면 풀어 본 이름을 '내 이름함 → 기록'에 자동 저장
   useEffect(() => {
@@ -542,8 +546,14 @@ export function ReportView({
         {!lib.user ? <p className="tiny muted">로그인하지 않아 이 결과는 저장되지 않아요.</p> : null}
       </section>
 
+      <AiSection summary={aiSummary(report, a, criteria, cur.gender)} />
+
       {saju ? <SajuPanel saju={saju} /> : null}
 
+      {!access.unlocked ? <Paywall title="자세한 풀이는 이용권으로 볼 수 있어요" lines={['항목별 자세한 풀이와 고쳐 보기', '같은 소리, 점수가 더 높은 한자', '추천 이름 전체(30개 이상)', 'AI가 써 주는 이 이름만의 풀이']} /> : null}
+
+
+      {access.unlocked ? (
       <section className="stack" style={{ gap: 10 }} aria-label="항목별 풀이">
         <div className="between">
           <h2>항목별 풀이</h2>
@@ -555,9 +565,9 @@ export function ReportView({
           </CriterionRow>
         ))}
       </section>
+      ) : null}
 
-
-      {better.length ? (
+      {access.unlocked && better.length ? (
         <section className="stack" style={{ gap: 10 }} aria-label="같은 소리 더 좋은 한자">
           <h2>같은 소리, 점수가 더 높은 한자</h2>
           <div className="stack" style={{ gap: 10 }}>

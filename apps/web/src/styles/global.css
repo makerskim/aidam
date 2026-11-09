@@ -3493,3 +3493,99 @@ img {
 .basis .basis-head[aria-expanded='true'] svg {
   transform: rotate(180deg);
 }
+
+/* 이용권 잠금 안내 */
+.paywall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  border: 1.5px solid var(--primary-soft);
+  background: linear-gradient(180deg, var(--primary-soft), var(--bg) 70%);
+}
+.pw-lock {
+  font-size: 28px;
+}
+.pw-title {
+  font-size: 20px;
+  text-wrap: balance;
+}
+.pw-count {
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+.pw-list {
+  margin: 0;
+  padding-left: 20px;
+  text-align: left;
+  color: var(--text-2);
+  display: grid;
+  gap: 4px;
+}
+.pw-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.pw-actions .btn {
+  width: 100%;
+  max-width: 340px;
+}
+.plan-name {
+  font-size: 18px;
+  color: var(--ink);
+}
+.plan-price {
+  font-size: 22px;
+  color: var(--primary-ink);
+}
+.admin-chip {
+  margin-left: 6px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.biz-info {
+  margin: 8px 0 0;
+}
+
+/* AI 풀이 */
+.ai-card {
+  gap: 14px;
+}
+.ai-text h3 {
+  font-size: 17px;
+  margin: 18px 0 6px;
+  color: var(--ink);
+}
+.ai-text h3:first-child {
+  margin-top: 0;
+}
+.ai-text p {
+  margin: 0 0 8px;
+  line-height: 1.75;
+  word-break: keep-all;
+}
+.ai-text ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.ai-answer + .ai-answer {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.ai-q {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--primary-ink);
+}
+.ai-ask {
+  display: flex;
+  gap: 8px;
+}
+.ai-ask .input {
+  flex: 1;
+  min-width: 0;
+}
