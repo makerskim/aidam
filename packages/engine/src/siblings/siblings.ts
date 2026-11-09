@@ -3,7 +3,7 @@ import { BRANCHES, STEMS, ZODIAC_KO } from '../core/ganji';
 import { decompose } from '../hangul/jamo';
 import { analyzeName, type Gender, type NameChar, type NameReport, type SchoolOptions } from '../name/analyze';
 import { soundElement } from '../name/sound';
-import { recommendBoth, recommendNames, type Preferences, type Recommendation } from '../recommend/recommend';
+import { dualScore, recommendBoth, recommendNames, type Preferences, type Recommendation } from '../recommend/recommend';
 import { computeSaju, type SajuResult } from '../saju';
 import { BRANCH_RELATION_KO, branchRelations, stemRelation, type BranchRelation } from '../saju/relations';
 import type { BirthInput, SajuOptions } from '../saju/pillars';
@@ -227,7 +227,7 @@ export function recommendSiblingSets(
         pairSum += pairOf(i, idx[i] as number, j, idx[j] as number).score;
         pairN++;
       }
-      const indiv = names.reduce((s, n) => s + n.report.score.total, 0) / names.length;
+      const indiv = names.reduce((s, n) => s + dualScore(n), 0) / names.length;
       results.push({ idx: [...idx], score: round1(0.6 * indiv + 0.4 * (pairSum / pairN)), key: names.map((n) => n.hanja).join('|'), set: names.map((n) => n.hangul).sort().join('|') });
       return;
     }
@@ -253,7 +253,7 @@ export function recommendSiblingSets(
           if (q.names.has(n.hangul)) continue;
           let add = 0;
           for (let i = 0; i < q.idx.length; i++) add += pairOf(i, q.idx[i] as number, k, c).score;
-          next.push({ idx: [...q.idx, c], indiv: q.indiv + n.report.score.total, pairSum: q.pairSum + add, pairN: q.pairN + q.idx.length, names: new Set([...q.names, n.hangul]) });
+          next.push({ idx: [...q.idx, c], indiv: q.indiv + dualScore(n), pairSum: q.pairSum + add, pairN: q.pairN + q.idx.length, names: new Set([...q.names, n.hangul]) });
         }
       }
       next.sort((a, b) => partScore(b) - partScore(a) || a.idx.join(',').localeCompare(b.idx.join(',')));
