@@ -17,6 +17,8 @@
 ### Claude 구독(Pro·Max) 로그인으로 AI를 돌릴 수는 없어요
 Anthropic 약관상 다른 사람이 쓰는 사이트에 Claude.ai 로그인(구독 OAuth)을 붙이거나, 구독 계정으로 사용자 요청을 대신 처리하는 것은 금지예요. 그래서 **API 키를 서버에만** 두는 방식으로 만들었어요. 로그인 자체는 지금처럼 Google 로그인(OAuth)이에요.
 
+**비용 없이 AI 풀이 받기**: 풀이 화면의 **'내 Claude 계정으로 풀이 받기 (무료)'** 버튼을 누르면, 사이트가 계산한 결과와 풀이 요청 글이 복사되고 claude.ai가 열려요. 대화 칸에 붙여 넣으면 이용자 자신의 Claude 요금제(무료·Pro·Max)로 풀이를 받아요. 사이트는 글만 만들어 줄 뿐 Claude 계정을 대신 쓰지 않으므로 약관에 맞고, 사이트 쪽 비용이 들지 않아요. API 키를 넣지 않으면 이 버튼만 보여요.
+
 ## 1. 저장소를 비공개로 바꾸기
 GitHub → aidam 저장소 → **Settings → General → 맨 아래 Danger Zone → Change visibility → Make private**
 

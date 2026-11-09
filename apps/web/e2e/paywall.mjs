@@ -1,4 +1,4 @@
-/* global document */
+/* global document, navigator */
 // 이용권 잠금 테스트. 서버(/api)는 가짜로 대신한다.
 // 사용법: VITE_DISABLE_CLOUD=1 VITE_API_BASE=/api vite build --outDir dist-pay && vite preview --outDir dist-pay --port 4174 & node e2e/paywall.mjs
 import { createRequire } from 'node:module';
@@ -9,7 +9,9 @@ const { chromium } = require('playwright');
 const BASE = process.env.BASE_URL ?? 'http://localhost:4174';
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['clipboard-read', 'clipboard-write'] });
+const page = await ctx.newPage();
+await ctx.route('https://claude.ai/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'claude' }));
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
@@ -101,6 +103,18 @@ await page.click('.ai-ask button');
 await page.waitForFunction(() => document.querySelectorAll('.ai-answer').length === 2);
 assert.equal(aiBodies[1]?.question, '부르기 쉬운가요?');
 console.log('✓ 관리자 풀이: 항목별 풀이 + AI 풀이·질문 (생년월일 안 보냄)');
+
+// 6) 내 Claude 계정으로(무료): 요청 글 복사 + claude.ai 열기
+{
+  const [popup] = await Promise.all([ctx.waitForEvent('page'), page.click('.ai-card button:has-text("내 Claude 계정으로")')]);
+  assert.ok(popup.url().startsWith('https://claude.ai/new'), `claude.ai가 열리지 않음: ${popup.url()}`);
+  await popup.close();
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(clip.includes('성명학') && clip.includes('"한글"'), '요청 글이 복사되지 않음');
+  assert.ok(!clip.includes('2026'), '복사한 글에 생년월일이 들어감');
+  assert.ok(await page.locator('text=복사했어요').count(), '복사 안내 없음');
+}
+console.log('✓ 내 Claude 계정으로 풀이(글 복사 + claude.ai 열기)');
 
 assert.deepEqual(errors, [], `페이지 오류: ${errors.join('\n')}`);
 await browser.close();
