@@ -1,4 +1,4 @@
-/* global document, navigator */
+/* global document */
 // 이용권 잠금 테스트. 서버(/api)는 가짜로 대신한다.
 // 사용법: VITE_DISABLE_CLOUD=1 VITE_API_BASE=/api vite build --outDir dist-pay && vite preview --outDir dist-pay --port 4174 & node e2e/paywall.mjs
 import { createRequire } from 'node:module';
