@@ -357,6 +357,14 @@ await m.goto(`${BASE}/#/report?s=broken!!`);
 await m.waitForSelector('text=풀이할 이름 정보가 없어요');
 console.log('✓ 깨진 링크 안내');
 
+// API 없이(서버 AI 꺼짐): 풀이 화면에 '내 Claude 계정으로' 버튼과 질문 칸만 보인다
+await page.goto(reportUrl);
+await page.waitForSelector('.ai-card');
+assert.ok(await page.locator('.ai-card button:has-text("내 Claude 계정으로 풀이 받기")').count(), '무료 AI 버튼 없음');
+assert.ok(await page.locator('.ai-card input[aria-label="AI에게 함께 물어볼 질문"]').count(), '질문 칸 없음');
+assert.equal(await page.locator('.ai-card button:has-text("AI 풀이 받기")').count(), 0, 'API 방식 버튼이 보임');
+console.log('✓ AI 풀이: API 없이 내 Claude 계정으로(무료)');
+
 await browser.close();
 const real = errors.filter((e) => !e.includes('React Router Future Flag'));
 assert.deepEqual(real, [], `콘솔 오류: ${real.join(' | ')}`);

@@ -7,17 +7,17 @@
 | 누가 | 볼 수 있는 것 |
 |---|---|
 | 로그인 안 함 / 이용권 없음 | 추천 이름 **3개**, 총평, 만세력 |
-| 이용권 있음(결제) | 추천 이름 전체, 항목별 자세한 풀이·고쳐 보기, 더 좋은 한자, **AI 풀이**(하루 20번) |
-| 관리자(makerskim@gmail.com) | 결제 없이 전부, AI 풀이 하루 100번 |
+| 이용권 있음(결제) | 추천 이름 전체, 항목별 자세한 풀이·고쳐 보기, 더 좋은 한자, **AI 풀이**(내 Claude 계정으로, 무료) |
+| 관리자(makerskim@gmail.com) | 결제 없이 전부 |
 
 - 서버는 **Cloudflare Workers(무료)** 하나로, 사이트와 서버를 같은 주소에서 함께 내보내요.
-- 결제는 **토스페이먼츠**, AI 풀이는 **Claude API**(서버에만 키를 둠)를 써요.
+- 결제는 **토스페이먼츠**를 써요. AI 풀이는 **API 없이, 비용 0원**이 기본이에요(아래 설명).
 - 가격·기간·하루 한도는 `apps/worker/wrangler.toml`의 `[vars]`에서 바꿔요(기본 9,900원 / 30일).
 
 ### Claude 구독(Pro·Max) 로그인으로 AI를 돌릴 수는 없어요
-Anthropic 약관상 다른 사람이 쓰는 사이트에 Claude.ai 로그인(구독 OAuth)을 붙이거나, 구독 계정으로 사용자 요청을 대신 처리하는 것은 금지예요. 그래서 **API 키를 서버에만** 두는 방식으로 만들었어요. 로그인 자체는 지금처럼 Google 로그인(OAuth)이에요.
+Anthropic 약관상 다른 사람이 쓰는 사이트에 Claude.ai 로그인(구독 OAuth)을 붙이거나, 구독 계정으로 사용자 요청을 대신 처리하는 것은 금지예요. 계정이 정지될 수 있어서 이 방식은 넣지 않았어요. 사이트 로그인은 지금처럼 Google 로그인(OAuth)이에요.
 
-**비용 없이 AI 풀이 받기**: 풀이 화면의 **'내 Claude 계정으로 풀이 받기 (무료)'** 버튼을 누르면, 사이트가 계산한 결과와 풀이 요청 글이 복사되고 claude.ai가 열려요. 대화 칸에 붙여 넣으면 이용자 자신의 Claude 요금제(무료·Pro·Max)로 풀이를 받아요. 사이트는 글만 만들어 줄 뿐 Claude 계정을 대신 쓰지 않으므로 약관에 맞고, 사이트 쪽 비용이 들지 않아요. API 키를 넣지 않으면 이 버튼만 보여요.
+**기본: API 없이, 비용 없이 AI 풀이 받기**: 풀이 화면의 **'내 Claude 계정으로 풀이 받기 (무료)'** 버튼을 누르면, 사이트가 계산한 결과와 풀이 요청 글이 복사되고 claude.ai가 열려요. 대화 칸에 붙여 넣으면 이용자 자신의 Claude 요금제(무료·Pro·Max)로 풀이를 받아요. 사이트는 글만 만들어 줄 뿐 Claude 계정을 대신 쓰지 않으므로 약관에 맞고, 사이트 쪽 비용이 들지 않아요. API 키를 넣지 않으면 이 버튼만 보여요.
 
 ## 1. 저장소를 비공개로 바꾸기
 GitHub → aidam 저장소 → **Settings → General → 맨 아래 Danger Zone → Change visibility → Make private**
@@ -37,7 +37,9 @@ GitHub → aidam 저장소 → **Settings → General → 맨 아래 Danger Zone
 3. 실제 결제(라이브 키)는 **사업자등록 + 토스 가맹 심사**가 필요해요. 심사 때 사이트에 사업자 정보와 환불 정책이 보여야 하니 `apps/web/src/business.ts`에 상호·대표자·사업자등록번호·통신판매업 신고번호·연락처를 채워 주세요(채우면 사이트 아래에 보여요).
 4. 결제 화면의 **환불 안내 문구**(`apps/web/src/pages/Pay.tsx`)는 초안이에요. 실제 정책에 맞게 고쳐 주세요.
 
-## 4. Claude API 키
+## 4. (선택, 안 해도 돼요) Claude API 키
+기본 설정은 API를 쓰지 않아요. 이 단계를 건너뛰면 AI 비용은 0원이고, 풀이 화면에는 '내 Claude 계정으로 풀이 받기' 버튼만 보여요. 붙여 넣는 과정 없이 사이트 안에서 바로 답이 나오게 하고 싶을 때만 아래를 하세요(이때는 사용한 만큼 비용이 나와요).
+
 1. https://console.anthropic.com 가입 → **Billing**에 결제 수단 등록(선불 크레딧).
 2. **Settings → Limits**에서 월 사용 한도를 꼭 걸어 두세요(예: $30).
 3. **API Keys → Create Key**로 키를 만들어 복사해요.
@@ -52,7 +54,7 @@ GitHub → aidam 저장소 → **Settings → Secrets and variables → Actions*
 | Variables | `TOSS_CLIENT_KEY` | 토스 **클라이언트 키**(`test_ck_…`) |
 | Secrets | `CLOUDFLARE_API_TOKEN` | 2-3에서 만든 토큰 |
 | Secrets | `TOSS_SECRET_KEY` | 토스 **시크릿 키**(`test_sk_…`) |
-| Secrets | `ANTHROPIC_API_KEY` | Claude API 키 |
+| Secrets | `ANTHROPIC_API_KEY` | (선택) Claude API 키. 안 넣으면 API를 쓰지 않아요 |
 
 키는 채팅이나 코드에 붙여 넣지 말고 여기에만 넣어 주세요.
 
@@ -64,7 +66,7 @@ Firebase 콘솔 → aidam-9aba3 → **Authentication → Settings → Authorized
 
 ## 8. 확인
 1. 로그아웃 상태로 이름 추천 → 3개만 보이고 이용권 안내가 나오는지.
-2. makerskim@gmail.com으로 로그인 → 계정 메뉴에 **관리자** 표시, 전체 목록, AI 풀이가 되는지.
+2. makerskim@gmail.com으로 로그인 → 계정 메뉴에 **관리자** 표시, 전체 목록, '내 Claude 계정으로 풀이 받기'가 되는지.
 3. 다른 Google 계정으로 로그인 → 이용권 결제(테스트 카드) → 전체가 열리는지.
 
 ## 알아 둘 점

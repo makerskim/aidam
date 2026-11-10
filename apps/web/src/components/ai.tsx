@@ -174,6 +174,16 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
         </button>
       ) : null}
       <div className="stack" style={{ gap: 6 }}>
+        {!serverAi && access.unlocked ? (
+          <input
+            className="input"
+            value={question}
+            maxLength={300}
+            placeholder="함께 물어볼 점이 있으면 적어 주세요 (선택)"
+            aria-label="AI에게 함께 물어볼 질문"
+            onChange={(e) => setQuestion(e.target.value)}
+          />
+        ) : null}
         <button type="button" className={`btn btn-block ${serverAi ? 'btn-outline' : 'btn-primary'}`} onClick={() => void openOwnClaude()}>
           내 Claude 계정으로 풀이 받기 (무료)
         </button>

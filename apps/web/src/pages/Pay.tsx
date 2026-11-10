@@ -81,7 +81,11 @@ export function PayPage() {
         <ul className="pw-list">
           <li>추천 이름 전체(30개 이상), 쌍둥이·다둥이 세트 전체</li>
           <li>이름마다 항목별 자세한 풀이와 고쳐 보기, 같은 소리 더 좋은 한자</li>
-          <li>AI가 써 주는 이 이름만의 풀이와 질문 답변(하루 {access.ai?.limit ?? 20}번)</li>
+          <li>
+            {access.aiReady
+              ? `AI가 써 주는 이 이름만의 풀이와 질문 답변(하루 ${access.ai?.limit ?? 20}번)`
+              : 'AI 풀이 요청 글 만들기: 내 Claude 계정에 붙여 넣으면 이 이름만의 풀이를 받아요'}
+          </li>
           <li>{plan?.days ?? 30}일 동안 이용, 자동으로 다시 결제되지 않아요</li>
         </ul>
         {ready ? (

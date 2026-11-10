@@ -3,7 +3,7 @@
 #
 # 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다.
 #   Variables: CLOUDFLARE_ACCOUNT_ID, TOSS_CLIENT_KEY(토스 클라이언트 키, 공개돼도 되는 값)
-#   Secrets:   CLOUDFLARE_API_TOKEN, TOSS_SECRET_KEY, ANTHROPIC_API_KEY
+#   Secrets:   CLOUDFLARE_API_TOKEN, TOSS_SECRET_KEY (ANTHROPIC_API_KEY는 선택: 없으면 AI는 API 없이 무료 방식만)
 # CLOUDFLARE_ACCOUNT_ID가 없으면 이 작업은 건너뛴다.
 name: Cloudflare
 
