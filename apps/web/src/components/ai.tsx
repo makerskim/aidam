@@ -8,6 +8,7 @@ import { useLibrary } from '../lib/library';
 import { PRESET_LABEL, presetOf } from '../lib/basis';
 import { hanjaMeaning } from '../lib/format';
 import { PLAIN, type Criterion } from '../lib/insights';
+import { bridgeCheck, bridgeExplain, readBridgeToken, saveBridgeToken } from '../lib/bridge';
 import { rememberReturn } from './paywall';
 import { ErrorText } from './ui';
 
@@ -107,16 +108,25 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
   const [error, setError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<{ q: string; text: string }[]>([]);
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null);
+  const [bridge, setBridge] = useState(readBridgeToken);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkToken, setLinkToken] = useState('');
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
   const serverAi = access.enabled && access.aiReady;
   if (!access.unlocked && !access.enabled) return null;
+  // 내 컴퓨터의 Claude Code 연결은 개인용: 결제가 켜진 사이트에서는 관리자에게만 보인다
+  const canBridge = access.unlocked && (access.admin || !access.enabled);
+  const useBridge = canBridge && bridge !== '';
+  const direct = useBridge || serverAi;
+
+  const toPay = () => {
+    rememberReturn(loc.pathname + loc.search);
+    navigate('/pay');
+  };
 
   /** 내 Claude 구독으로 무료로: 요청 글을 복사하고 claude.ai를 연다 */
   const openOwnClaude = async () => {
-    if (!access.unlocked) {
-      rememberReturn(loc.pathname + loc.search);
-      navigate('/pay');
-      return;
-    }
+    if (!access.unlocked) return toPay();
     const text = buildPrompt(summary, question.trim() || undefined);
     // 복사를 먼저 해야 한다(새 창이 열리면 이 화면이 포커스를 잃어 복사가 막힌다)
     try {
@@ -131,27 +141,48 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
   };
 
   const ask = async (q: string) => {
-    if (!lib.user) {
-      gate.openLogin();
-      return;
-    }
-    if (!access.unlocked) {
-      rememberReturn(loc.pathname + loc.search);
-      navigate('/pay');
-      return;
+    if (!useBridge) {
+      if (!lib.user) return gate.openLogin();
+      if (!access.unlocked) return toPay();
     }
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ text: string; cached: boolean; left: number }>('/ai/explain', { summary, question: q || undefined });
-      setAnswers((a) => [...a, { q, text: r.text }]);
-      access.setAiLeft(r.left);
+      let text: string;
+      if (useBridge) {
+        text = await bridgeExplain(bridge, buildPrompt(summary, q || undefined));
+      } else {
+        const r = await api<{ text: string; cached: boolean; left: number }>('/ai/explain', { summary, question: q || undefined });
+        text = r.text;
+        access.setAiLeft(r.left);
+      }
+      setAnswers((a) => [...a, { q, text }]);
       setQuestion('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'AI 풀이를 받지 못했어요.');
     } finally {
       setBusy(false);
     }
+  };
+
+  const connect = async () => {
+    const t = linkToken.trim();
+    if (!t) return;
+    setLinkMsg('확인 중…');
+    try {
+      await bridgeCheck(t);
+      saveBridgeToken(t);
+      setBridge(t);
+      setLinkToken('');
+      setLinkMsg(null);
+      setLinkOpen(false);
+    } catch (e) {
+      setLinkMsg(e instanceof Error ? e.message : '연결하지 못했어요.');
+    }
+  };
+  const disconnect = () => {
+    saveBridgeToken('');
+    setBridge('');
   };
 
   return (
@@ -161,40 +192,42 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
           <span className="section-kicker">AI 풀이</span>
           <h2 style={{ marginTop: 4 }}>이 이름만의 이야기</h2>
         </div>
-        {access.ai && access.unlocked ? <span className="chip num">오늘 {access.ai.left}번 남음</span> : null}
+        {useBridge ? <span className="chip chip-primary">내 Claude Code 연결됨</span> : access.ai && access.unlocked && serverAi ? <span className="chip num">오늘 {access.ai.left}번 남음</span> : null}
       </div>
       {answers.length === 0 ? (
         <p className="small" style={{ color: 'var(--text-2)' }}>
           사이트가 계산한 점수와 사주를 바탕으로, AI가 이 이름의 뜻과 어울림을 자연스러운 글로 풀어 드려요.
         </p>
       ) : null}
-      {answers.length === 0 && serverAi ? (
-        <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={() => void ask('')}>
-          {busy ? 'AI가 풀이를 쓰고 있어요…' : access.unlocked ? 'AI 풀이 받기' : '이용권으로 AI 풀이 받기'}
+      {answers.length === 0 && access.unlocked && (useBridge || !serverAi) ? (
+        <input
+          className="input"
+          value={question}
+          maxLength={300}
+          placeholder="함께 물어볼 점이 있으면 적어 주세요 (선택)"
+          aria-label="AI에게 함께 물어볼 질문"
+          onChange={(e) => setQuestion(e.target.value)}
+        />
+      ) : null}
+      {answers.length === 0 && direct ? (
+        <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={() => void ask(useBridge ? question.trim() : '')}>
+          {busy ? 'AI가 풀이를 쓰고 있어요…' : useBridge ? '내 Claude Code로 풀이 받기' : access.unlocked ? 'AI 풀이 받기' : '이용권으로 AI 풀이 받기'}
         </button>
       ) : null}
-      <div className="stack" style={{ gap: 6 }}>
-        {!serverAi && access.unlocked ? (
-          <input
-            className="input"
-            value={question}
-            maxLength={300}
-            placeholder="함께 물어볼 점이 있으면 적어 주세요 (선택)"
-            aria-label="AI에게 함께 물어볼 질문"
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-        ) : null}
-        <button type="button" className={`btn btn-block ${serverAi ? 'btn-outline' : 'btn-primary'}`} onClick={() => void openOwnClaude()}>
-          내 Claude 계정으로 풀이 받기 (무료)
-        </button>
-        <p className="tiny muted">
-          누르면 풀이 요청 글이 복사되고 claude.ai가 열려요. 새 대화 칸에 붙여 넣기만 하면 내 Claude 요금제로 풀이를 받아요.
-        </p>
-        {copied === 'ok' ? <p className="small" style={{ color: 'var(--good)', fontWeight: 700 }}>복사했어요. claude.ai 대화 칸에 붙여 넣으세요(Ctrl+V · 길게 눌러 붙여넣기).</p> : null}
-        {copied === 'fail' ? (
-          <textarea className="input ai-prompt" readOnly rows={6} value={buildPrompt(summary, question.trim() || undefined)} aria-label="Claude에 붙여 넣을 글" onFocus={(e) => e.currentTarget.select()} />
-        ) : null}
-      </div>
+      {!useBridge ? (
+        <div className="stack" style={{ gap: 6 }}>
+          <button type="button" className={`btn btn-block ${serverAi ? 'btn-outline' : 'btn-primary'}`} onClick={() => void openOwnClaude()}>
+            내 Claude 계정으로 풀이 받기 (무료)
+          </button>
+          <p className="tiny muted">
+            누르면 풀이 요청 글이 복사되고 claude.ai가 열려요. 새 대화 칸에 붙여 넣기만 하면 내 Claude 요금제로 풀이를 받아요.
+          </p>
+          {copied === 'ok' ? <p className="small" style={{ color: 'var(--good)', fontWeight: 700 }}>복사했어요. claude.ai 대화 칸에 붙여 넣으세요(Ctrl+V · 길게 눌러 붙여넣기).</p> : null}
+          {copied === 'fail' ? (
+            <textarea className="input ai-prompt" readOnly rows={6} value={buildPrompt(summary, question.trim() || undefined)} aria-label="Claude에 붙여 넣을 글" onFocus={(e) => e.currentTarget.select()} />
+          ) : null}
+        </div>
+      ) : null}
       {answers.map((a, i) => (
         <div key={i} className="ai-answer">
           {a.q ? <p className="ai-q">“{a.q}”</p> : null}
@@ -223,6 +256,51 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
         </form>
       ) : null}
       {error ? <ErrorText>{error}</ErrorText> : null}
+      {canBridge ? (
+        <div className="ai-link stack" style={{ gap: 8 }}>
+          {useBridge ? (
+            <button type="button" className="text-btn" onClick={disconnect}>
+              내 Claude Code 연결 끊기
+            </button>
+          ) : (
+            <button type="button" className="text-btn" aria-expanded={linkOpen} onClick={() => setLinkOpen((o) => !o)}>
+              내 컴퓨터의 Claude Code 연결 (개인용)
+            </button>
+          )}
+          {linkOpen && !useBridge ? (
+            <div className="card-soft stack small" style={{ gap: 8 }}>
+              <p>
+                내 컴퓨터에 로그인된 Claude Code가 구독 요금제로 풀이를 써서, 이 화면에 바로 보여 줘요. 붙여 넣을 필요가 없고 API 비용도 없어요.
+              </p>
+              <ol className="ai-steps">
+                <li>
+                  <a href="./aidam-claude-bridge.mjs" download>
+                    연결 프로그램 내려받기
+                  </a>
+                </li>
+                <li>
+                  터미널에서 <code>node aidam-claude-bridge.mjs</code> 실행
+                </li>
+                <li>터미널에 나온 연결 번호를 아래에 넣기</li>
+              </ol>
+              <form
+                className="ai-ask"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void connect();
+                }}
+              >
+                <input className="input" value={linkToken} placeholder="연결 번호" aria-label="연결 번호" autoComplete="off" onChange={(e) => setLinkToken(e.target.value)} />
+                <button type="submit" className="btn btn-outline" disabled={!linkToken.trim()}>
+                  연결
+                </button>
+              </form>
+              {linkMsg ? <p style={{ color: 'var(--bad)' }}>{linkMsg}</p> : null}
+              <p className="tiny muted">Chrome·Edge에서 돼요. 처음 연결할 때 브라우저가 '내 기기 접근'을 물으면 허용해 주세요. 이 컴퓨터에서만 동작해요.</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <p className="tiny muted">AI(Claude)가 쓴 글이라 틀릴 수 있어요. 점수와 등급은 사이트 계산이 기준이에요. 생년월일 원문은 보내지 않아요.</p>
     </section>
   );

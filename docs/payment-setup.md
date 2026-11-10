@@ -19,6 +19,8 @@ Anthropic 약관상 다른 사람이 쓰는 사이트에 Claude.ai 로그인(구
 
 **기본: API 없이, 비용 없이 AI 풀이 받기**: 풀이 화면의 **'내 Claude 계정으로 풀이 받기 (무료)'** 버튼을 누르면, 사이트가 계산한 결과와 풀이 요청 글이 복사되고 claude.ai가 열려요. 대화 칸에 붙여 넣으면 이용자 자신의 Claude 요금제(무료·Pro·Max)로 풀이를 받아요. 사이트는 글만 만들어 줄 뿐 Claude 계정을 대신 쓰지 않으므로 약관에 맞고, 사이트 쪽 비용이 들지 않아요. API 키를 넣지 않으면 이 버튼만 보여요.
 
+**개인용: 내 컴퓨터의 Claude Code 연결**: 관리자는 내 컴퓨터에 로그인된 Claude Code(구독 로그인)를 사이트에 연결해, 붙여 넣기 없이 화면에서 바로 풀이를 받을 수 있어요. 방법은 `docs/claude-bridge.md`.
+
 ## 1. 저장소를 비공개로 바꾸기
 GitHub → aidam 저장소 → **Settings → General → 맨 아래 Danger Zone → Change visibility → Make private**
 
