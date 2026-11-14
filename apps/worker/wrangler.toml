@@ -18,14 +18,19 @@ id = "KV_NAMESPACE_ID"
 
 [vars]
 FIREBASE_PROJECT_ID = "aidam-9aba3"
-# 1회 이용권: 가격(원)과 결제 후 쓸 수 있는 시간
+# 1회 = 분석 1건. 가격(원)
 PRICE_KRW = "990"
-PASS_HOURS = "24"
-ORDER_NAME = "아이담 1회 이용권"
+ORDER_NAME = "아이담 이름 분석 1회"
+# 관리자 번호를 한 번 넣으면 결제 없이 쓸 수 있는 시간
+ADMIN_PASS_HOURS = "12"
 AI_DAILY_LIMIT = "20"
 AI_ADMIN_DAILY_LIMIT = "100"
 AI_GLOBAL_DAILY_LIMIT = "200"
 AI_MODEL = "claude-opus-5-5"
 
-# 비밀값(코드·저장소에 넣지 않는다): ADMIN_EMAILS(관리자 이메일), TOSS_SECRET_KEY, ANTHROPIC_API_KEY(선택)
-# GitHub 저장소 Settings → Secrets에 넣으면 배포 때 자동으로 올라간다.
+# 비밀값(코드·저장소에 넣지 않는다). GitHub 저장소 Settings → Secrets에 넣으면 배포 때 자동으로 올라간다.
+#   ADMIN_EMAILS      관리자 Google 계정 이메일
+#   TOSS_SECRET_KEY   토스페이먼츠 시크릿 키
+#   NTFY_TOPIC        관리자 번호를 휴대폰 알림으로 받을 주제 이름(무료)
+#   SOLAPI_API_KEY, SOLAPI_API_SECRET, SMS_FROM, ADMIN_PHONE   관리자 번호를 문자로 받을 때(선택, 건당 요금)
+#   ANTHROPIC_API_KEY (선택) 넣으면 서버가 API로 AI 풀이를 한다

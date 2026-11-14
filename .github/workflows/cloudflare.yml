@@ -3,8 +3,9 @@
 #
 # 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다.
 #   Variables: CLOUDFLARE_ACCOUNT_ID, TOSS_CLIENT_KEY(토스 클라이언트 키, 공개돼도 되는 값)
-#   Secrets:   CLOUDFLARE_API_TOKEN, ADMIN_EMAILS(관리자 이메일), TOSS_SECRET_KEY
-#              (ANTHROPIC_API_KEY는 선택: 없으면 AI는 API 없이 무료 방식만)
+#   Secrets:   CLOUDFLARE_API_TOKEN, ADMIN_EMAILS(관리자 이메일), TOSS_SECRET_KEY,
+#              NTFY_TOPIC(관리자 번호를 받을 휴대폰 알림 주제)
+#              선택: SOLAPI_API_KEY·SOLAPI_API_SECRET·SMS_FROM·ADMIN_PHONE(관리자 번호를 문자로), ANTHROPIC_API_KEY
 # CLOUDFLARE_ACCOUNT_ID가 없으면 이 작업은 건너뛴다.
 name: Cloudflare
 
@@ -86,9 +87,14 @@ jobs:
         env:
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
           TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
+          SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SMS_FROM: ${{ secrets.SMS_FROM }}
+          ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          for NAME in ADMIN_EMAILS TOSS_SECRET_KEY ANTHROPIC_API_KEY; do
+          for NAME in ADMIN_EMAILS TOSS_SECRET_KEY NTFY_TOPIC SOLAPI_API_KEY SOLAPI_API_SECRET SMS_FROM ADMIN_PHONE ANTHROPIC_API_KEY; do
             VALUE="${!NAME}"
             if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | npx wrangler secret put "$NAME"; fi
           done

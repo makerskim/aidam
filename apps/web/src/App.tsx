@@ -10,7 +10,7 @@ import { SettingsPage } from './pages/Settings';
 import { SajuPage } from './pages/Saju';
 import { LibraryProvider, useLibrary } from './lib/library';
 import { GateProvider, useGate } from './lib/gate';
-import { AccessProvider, timeKo, useAccess } from './lib/access';
+import { AccessProvider, useAccess } from './lib/access';
 import { PayDone, PayPage } from './pages/Pay';
 import { ConnectPage } from './pages/Connect';
 import { BUSINESS } from './business';
@@ -92,7 +92,7 @@ function AccountMenu() {
           </div>
           {access.enabled ? (
             <button type="button" role="menuitem" onClick={() => go('/pay')}>
-              {access.admin ? '이용권 (관리자 무료)' : access.paid && access.until ? `이용권 · ${timeKo(access.until)}까지` : '이용권'}
+              {access.adminOn ? '관리자 모드 켜짐' : access.admin ? '결제 · 관리자 번호' : '결제 안내'}
             </button>
           ) : null}
           <button type="button" role="menuitem" onClick={() => go('/me?tab=saved')}>

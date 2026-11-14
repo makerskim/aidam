@@ -9,6 +9,7 @@ import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { FREE_NAMES, useAccess } from '../lib/access';
 import { Paywall } from '../components/paywall';
+import { resultKey } from '../lib/ticket';
 import { readSession, useSessionState, writeSession } from '../lib/session';
 import { SajuPanel } from '../components/report';
 import { HarmonyView } from '../components/harmony';
@@ -132,6 +133,9 @@ export function Results() {
   const navigate = useNavigate();
   const state = useMemo(() => fromSearch<NameState>(search), [search]);
   const access = useAccess();
+  // 이 입력(성·아이 정보·조건·계산 기준)의 분석 열쇠. 입력을 바꾸면 열쇠가 달라져 새 분석이 된다
+  const ticket = useMemo(() => (state ? resultKey(state) : ''), [state]);
+  const open = access.can(ticket);
   const params = new URLSearchParams(search);
   const fix = params.get('fix') as Criterion['key'] | 'clean' | null;
   const sKey = params.get('s') ?? '';
@@ -245,7 +249,7 @@ export function Results() {
 
   const renderList = (recs: Recommendation[], saju: SajuResult | null, kidIndex: number | null) => {
     const { list, hasS } = filterList(recs, saju?.primary ?? null);
-    const shown = list.slice(0, access.unlocked ? ui.shown : FREE_NAMES);
+    const shown = list.slice(0, open ? ui.shown : FREE_NAMES);
     const styleName = STYLE_LABEL[state.prefs.style];
     const hasFit = list.some((r) => r.fit === 0);
     const mixed = hasFit && list.some((r) => (r.fit ?? 0) > 0);
@@ -300,8 +304,8 @@ export function Results() {
             </Fragment>
           ))}
         </div>
-        {!access.unlocked && list.length > FREE_NAMES ? <Paywall title="나머지 이름은 이용권으로 볼 수 있어요" hidden={list.length - FREE_NAMES} /> : null}
-        {access.unlocked && list.length > ui.shown ? (
+        {!open && list.length > FREE_NAMES ? <Paywall ticket={ticket} title="나머지 이름은 결제 후 볼 수 있어요" hidden={list.length - FREE_NAMES} /> : null}
+        {open && list.length > ui.shown ? (
           <button type="button" className="btn btn-outline btn-block" onClick={() => setUi({ shown: ui.shown + PAGE })}>
             이름 더 보기
           </button>
@@ -416,7 +420,7 @@ export function Results() {
                   어울리는 이름 세트 <span className="num muted">{data.sets.length}</span>
                 </h2>
                 {data.sets.length === 0 ? <p className="muted">조건에 맞는 세트가 없어요. 조건을 바꿔 보세요.</p> : null}
-                {data.sets.slice(0, access.unlocked ? data.sets.length : 1).map((set, si) => (
+                {data.sets.slice(0, open ? data.sets.length : 1).map((set, si) => (
                   <article key={si} className="set-card">
                     <div className="set-head">
                       <span className={`rank ${si < 3 ? 'top' : ''}`}>{si + 1}</span>
@@ -434,7 +438,7 @@ export function Results() {
                     <HarmonyView pairs={set.pairs} names={set.names.map((n) => n.hangul.slice(state.surname.hangul.length))} />
                   </article>
                 ))}
-                {!access.unlocked && data.sets.length > 1 ? <Paywall title="나머지 세트는 이용권으로 볼 수 있어요" lines={['어울리는 이름 세트 전체', '아이마다 따로 고르기 전체 목록', '항목별 자세한 풀이', 'AI가 써 주는 이 이름만의 풀이']} /> : null}
+                {!open && data.sets.length > 1 ? <Paywall ticket={ticket} title="나머지 세트는 결제 후 볼 수 있어요" lines={['이 조건의 어울리는 이름 세트 전체', '이름마다 항목별 자세한 풀이', '결제한 분석은 언제든 다시 볼 수 있어요']} /> : null}
               </section>
             </div>
           ) : null}

@@ -9,7 +9,7 @@ import { PRESET_LABEL, presetOf } from '../lib/basis';
 import { hanjaMeaning } from '../lib/format';
 import { PLAIN, type Criterion } from '../lib/insights';
 import { bridgeAvailable, bridgeExplain } from '../lib/bridge';
-import { rememberReturn } from './paywall';
+import { rememberPending } from './paywall';
 import { ErrorText } from './ui';
 
 const el = (e: Element) => `${PLAIN[e]}(${ELEMENT_HANJA[e]})`;
@@ -97,7 +97,7 @@ function AiText({ text }: { text: string }) {
   return <div className="ai-text">{blocks}</div>;
 }
 
-export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }) {
+export function AiSection({ summary, ticket }: { summary: ReturnType<typeof aiSummary>; ticket: string }) {
   const access = useAccess();
   const lib = useLibrary();
   const gate = useGate();
@@ -117,19 +117,19 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
     };
   }, []);
   const serverAi = access.enabled && access.aiReady;
-  if (!access.unlocked && !access.enabled) return null;
+  const open = access.can(ticket);
   // 내 컴퓨터의 Claude Code 연결(개인용): 연결 프로그램으로 연 화면에서만, 결제가 켜진 사이트에서는 관리자만
-  const useBridge = bridge && access.unlocked && (access.admin || !access.enabled);
+  const useBridge = bridge && open && (access.adminOn || !access.enabled);
   const direct = useBridge || serverAi;
 
   const toPay = () => {
-    rememberReturn(loc.pathname + loc.search);
+    rememberPending({ ticket, back: loc.pathname + loc.search });
     navigate('/pay');
   };
 
   /** 내 Claude 구독으로 무료로: 요청 글을 복사하고 claude.ai를 연다 */
   const openOwnClaude = async () => {
-    if (!access.unlocked) return toPay();
+    if (!open) return toPay();
     const text = buildPrompt(summary, question.trim() || undefined);
     // 복사를 먼저 해야 한다(새 창이 열리면 이 화면이 포커스를 잃어 복사가 막힌다)
     try {
@@ -146,7 +146,7 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
   const ask = async (q: string) => {
     if (!useBridge) {
       if (!lib.user) return gate.openLogin();
-      if (!access.unlocked) return toPay();
+      if (!open) return toPay();
     }
     setBusy(true);
     setError(null);
@@ -175,14 +175,14 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
           <span className="section-kicker">AI 풀이</span>
           <h2 style={{ marginTop: 4 }}>이 이름만의 이야기</h2>
         </div>
-        {useBridge ? <span className="chip chip-primary">내 Claude Code 연결됨</span> : access.ai && access.unlocked && serverAi ? <span className="chip num">오늘 {access.ai.left}번 남음</span> : null}
+        {useBridge ? <span className="chip chip-primary">내 Claude Code 연결됨</span> : access.ai && open && serverAi ? <span className="chip num">오늘 {access.ai.left}번 남음</span> : null}
       </div>
       {answers.length === 0 ? (
         <p className="small" style={{ color: 'var(--text-2)' }}>
           사이트가 계산한 점수와 사주를 바탕으로, AI가 이 이름의 뜻과 어울림을 자연스러운 글로 풀어 드려요.
         </p>
       ) : null}
-      {answers.length === 0 && access.unlocked && (useBridge || !serverAi) ? (
+      {answers.length === 0 && open && (useBridge || !serverAi) ? (
         <input
           className="input"
           value={question}
@@ -194,7 +194,7 @@ export function AiSection({ summary }: { summary: ReturnType<typeof aiSummary> }
       ) : null}
       {answers.length === 0 && direct ? (
         <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={() => void ask(useBridge ? question.trim() : '')}>
-          {busy ? 'AI가 풀이를 쓰고 있어요…' : useBridge ? '내 Claude Code로 풀이 받기' : access.unlocked ? 'AI 풀이 받기' : '이용권으로 AI 풀이 받기'}
+          {busy ? 'AI가 풀이를 쓰고 있어요…' : useBridge ? '내 Claude Code로 풀이 받기' : open ? 'AI 풀이 받기' : '결제하고 AI 풀이 받기'}
         </button>
       ) : null}
       {!useBridge ? (

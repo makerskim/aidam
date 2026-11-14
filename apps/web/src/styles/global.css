@@ -3606,3 +3606,7 @@ img {
   border-radius: 6px;
   font-size: 13px;
 }
+.admin-code {
+  gap: 12px;
+  border: 1.5px dashed var(--line);
+}
