@@ -7,3 +7,4 @@ dist-preview/
 dist-pay/
 .wrangler/
 dist-sign/
+.dev.vars

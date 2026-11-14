@@ -45,13 +45,13 @@ function AdminCode({ onDone }: { onDone: () => void }) {
   const verify = () =>
     run(async () => {
       const r = await api<{ me: Me }>('/admin/verify', { code });
-      await access.apply(r.me, true);
+      await access.apply(r.me);
       onDone();
     });
   const off = () =>
     run(async () => {
       const r = await api<{ me: Me }>('/admin/off', {});
-      await access.apply(r.me, true);
+      await access.apply(r.me);
       setSent(null);
     });
 
@@ -71,7 +71,7 @@ function AdminCode({ onDone }: { onDone: () => void }) {
           </button>
         </>
       ) : access.codeChannel === null ? (
-        <p className="small muted">관리자 번호를 받을 휴대폰 설정이 아직 없어요. 설정 안내(docs/payment-setup.md)의 ‘관리자 번호 받을 휴대폰’ 단계를 해 주세요.</p>
+        <p className="small muted">관리자 번호를 받을 휴대폰 설정이 아직 없어요. 설정 안내(docs/setup.md)의 ‘관리자 번호를 받을 휴대폰’ 단계를 해 주세요.</p>
       ) : (
         <>
           <p className="small" style={{ color: 'var(--text-2)' }}>
@@ -156,18 +156,18 @@ export function PayPage() {
     }
   };
 
-  const ready = access.enabled && access.payReady && CLIENT_KEY !== '';
+  const ready = access.enabled && access.payMode !== 'off' && CLIENT_KEY !== '';
   return (
     <main className="container narrow page stack-lg">
       <div className="stack" style={{ gap: 8 }}>
         <span className="section-kicker">결제</span>
         <h1>이름 분석 1회</h1>
-        <p style={{ color: 'var(--text-2)' }}>한 번 결제로 분석 한 건을 전부 볼 수 있어요.</p>
+        <p style={{ color: 'var(--text-2)' }}>첫 분석 1회는 무료예요. 그 뒤 조건을 바꾼 새 분석은 한 건씩 결제해요.</p>
       </div>
 
       {owned ? (
         <div className="stack" style={{ gap: 12 }}>
-          <p className="note-soft">{access.adminOn ? '관리자 모드라 결제 없이 볼 수 있어요.' : '이 분석은 이미 결제했어요. 언제든 다시 볼 수 있어요.'}</p>
+          <p className="note-soft">{access.adminOn ? '관리자 모드라 결제 없이 볼 수 있어요.' : '이 분석은 이미 열려 있어요. 언제든 다시 볼 수 있어요.'}</p>
           <button type="button" className="btn btn-primary btn-lg" onClick={() => navigate(backPath(), { replace: true })}>
             보던 화면으로
           </button>
@@ -176,12 +176,14 @@ export function PayPage() {
         <section className="card stack plan-card">
           <div className="between">
             <b className="plan-name">{plan?.orderName ?? '아이담 이름 분석 1회'}</b>
-            <b className="plan-price num">{plan ? won(plan.amount) : ''}</b>
+            <b className="plan-price num">
+              {access.payMode === 'test' ? <span className="chip">시험 결제</span> : null} {plan ? won(plan.amount) : ''}
+            </b>
           </div>
           <ul className="pw-list">
             <li>이 조건의 추천 이름 전체(30개 이상), 쌍둥이·다둥이는 세트 전체</li>
             <li>이름마다 항목별 자세한 풀이와 고쳐 보기, 같은 소리 더 좋은 한자</li>
-            <li>결제한 분석은 로그인하면 언제든 다시 볼 수 있어요</li>
+            <li>연 분석은 로그인하면 언제든 다시 볼 수 있어요</li>
             <li>아이 정보·이름 조건·계산 기준을 바꾸면 새 분석이라 따로 결제해요</li>
             <li>카드, 카카오페이·네이버페이·토스페이 같은 간편결제(결제창에서 선택)</li>
           </ul>
@@ -192,7 +194,7 @@ export function PayPage() {
               {busy ? '결제창 여는 중…' : lib.user ? `${plan ? won(plan.amount) : ''} 결제하기` : '로그인하고 결제하기'}
             </button>
           ) : (
-            <p className="small muted">결제 준비 중이에요. 곧 열려요.</p>
+            <p className="note-soft">결제는 준비 중이에요. 정식으로 문을 열면 여기서 결제할 수 있어요.</p>
           )}
           {error ? <ErrorText>{error}</ErrorText> : null}
         </section>

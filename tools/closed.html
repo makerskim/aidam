@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>아이담 · 준비 중</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;color:#1b1e26;font-family:-apple-system,BlinkMacSystemFont,system-ui,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif}
+  main{max-width:340px;padding:32px 24px;text-align:center}
+  b{display:block;font-size:40px;letter-spacing:-.02em}
+  span{display:block;color:#d63a55;letter-spacing:.3em;font-size:12px;font-weight:700;margin-top:4px}
+  h1{font-size:20px;margin:28px 0 8px}
+  p{color:#50576a;line-height:1.6;margin:0;word-break:keep-all}
+</style>
+</head>
+<body>
+<main><b>아이담</b><span>AIDAM</span><h1>준비 중이에요</h1><p>아이의 이름에 의미를 담는 작명 서비스를 준비하고 있어요. 곧 만나요.</p></main>
+<script>
+  // 예전에 이 주소를 열어 본 브라우저에 남은 사이트 저장분을 지운다
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
+  if ('caches' in window) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
+</script>
+</body>
+</html>

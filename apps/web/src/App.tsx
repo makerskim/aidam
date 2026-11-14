@@ -92,7 +92,7 @@ function AccountMenu() {
           </div>
           {access.enabled ? (
             <button type="button" role="menuitem" onClick={() => go('/pay')}>
-              {access.adminOn ? '관리자 모드 켜짐' : access.admin ? '결제 · 관리자 번호' : '결제 안내'}
+              {access.adminOn ? '관리자 모드 켜짐' : access.admin ? '결제 · 관리자 번호' : '이용 안내'}
             </button>
           ) : null}
           <button type="button" role="menuitem" onClick={() => go('/me?tab=saved')}>
@@ -154,7 +154,7 @@ export function AboutPanel() {
     <div className="about-panel" id="about">
       <h3>점수는 정해진 규칙으로 계산해요</h3>
       <p>
-        점수와 등급은 전통 성명학의 규칙을 그대로 옮긴 계산식으로, 이용자의 브라우저 안에서 계산해요. 그래서 같은 정보를 넣으면 <b>언제나 같은 결과</b>가 나와요. 이용권의 <b>AI 풀이</b>는 이 계산 결과를 Claude(Anthropic)가 자연스러운 글로 풀어 쓴 것이에요.
+        점수와 등급은 전통 성명학의 규칙을 그대로 옮긴 계산식으로, 이용자의 브라우저 안에서 계산해요. 그래서 같은 정보를 넣으면 <b>언제나 같은 결과</b>가 나와요. <b>AI 풀이</b>는 이 계산 결과를 각자 자기 Claude 계정에 붙여 넣어 받는 글이에요.
       </p>
       <h3>이름을 고르는 순서</h3>
       <ol className="stack" style={{ margin: 0, paddingLeft: 20, gap: 4 }}>
@@ -213,6 +213,8 @@ function RequireUser({ children }: { children: ReactNode }) {
   const lib = useLibrary();
   const gate = useGate();
   if (lib.user) return <>{children}</>;
+  // 로그인 상태를 확인하는 동안에는 '로그인이 필요해요'를 잠깐 보이지 않게 한다
+  if (!lib.cloudReady) return null;
   return (
     <main className="container narrow page stack" style={{ alignItems: 'flex-start' }}>
       <h1>로그인이 필요해요</h1>
@@ -253,14 +255,14 @@ function Shell() {
 export function App() {
   return (
     <HashRouter>
-      <LibraryProvider>
-        <AccessProvider>
+      <AccessProvider>
+        <LibraryProvider>
           <GateProvider>
             <PayReturn />
             <Shell />
           </GateProvider>
-        </AccessProvider>
-      </LibraryProvider>
+        </LibraryProvider>
+      </AccessProvider>
     </HashRouter>
   );
 }

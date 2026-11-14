@@ -9,7 +9,7 @@
 - 결과는 **총평 → 항목별 한 줄 → 눌러서 자세히**, 아쉬운 항목은 **더 좋게 바꾸는 옵션** 제공
 - 이름마다 **작명가의 한마디**, **사주에서 채워 주는 것 / 좋은 점 / 아쉬운 점**, **점수표**
 - 기준마다 **무엇이 있어서/없어서 좋은지, 왜 아쉬운지** 일상어로 풀이
-- 로그인하면: **저장한 이름**·**검색 기록**(자동 기록·비교), 설정(켜고 끄기)
+- Google·카카오로 로그인하면: **첫 분석 1회 무료**, **저장한 이름**·**검색 기록**, 설정(켜고 끄기)
 - 로그인 없이도 이름 짓기 가능(결과는 저장되지 않음)
 - 같은 입력이면 언제나 같은 결과(무작위 없음). 만세력 계산 규칙과 검증은 [docs/manse-algorithm.md](./docs/manse-algorithm.md)
 - AI·유료 API를 쓰지 않아요. 계산은 모두 이용자 브라우저 안에서 해요
@@ -20,33 +20,12 @@ Made by makerskim
 
 ---
 
-## 사이트 공개하기 (GitHub Pages, 무료)
+## 사이트 올리기와 설정
 
-공개 저장소라면 GitHub Pages와 GitHub Actions가 모두 무료이고 배포 횟수 제한·크레딧이 없습니다. 처음 한 번만 아래를 하면, 이후에는 GitHub에 수정이 올라올 때마다 사이트가 자동으로 바뀝니다.
+사이트와 서버는 Cloudflare Workers + D1(무료)로 한 주소에서 나갑니다. 로그인(Google·카카오), 출시 전 잠금, 첫 1회 무료 뒤 1회 990원, 결제 뼈대, 관리자 번호가 들어 있습니다.
 
-1. **https://github.com/makerskim/aidam/settings** 맨 아래 **Danger Zone → Change repository visibility → Change to public**을 누르고 안내대로 확인합니다.
-2. 같은 설정 화면 왼쪽 메뉴 **Pages**를 누르고, **Build and deployment → Source**를 **GitHub Actions**로 바꿉니다.
-3. 저장소 위쪽 **Actions** 탭 → 왼쪽 **Pages** → 오른쪽 **Run workflow** 버튼을 눌러 첫 배포를 시작합니다(2~3분).
-4. 끝나면 **https://makerskim.github.io/aidam/** 이 사이트 주소입니다.
-5. Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 `makerskim.github.io`를 추가합니다(구글 로그인용).
-6. Netlify는 더 쓰지 않으므로 Netlify에서 **Site configuration → Delete site**로 지워도 됩니다.
-
-배포가 실패하면 **Actions** 탭에서 빨간 항목을 눌러 로그를 복사해 Claude에게 보여 주세요.
-
----
-
-## Google 로그인 켜기 (Firebase, 무료)
-
-로그인 없이도 이 기기에 기록·북마크가 저장됩니다. 계정에 저장하려면 아래를 한 번만 하면 됩니다.
-
-1. **https://console.firebase.google.com** 에 Google 계정으로 들어가 **프로젝트 추가** → 이름 `aidam` → (Google 애널리틱스는 꺼도 됨) → 만들기.
-2. 왼쪽 **빌드 → Authentication → 시작하기 → Google** 을 눌러 **사용 설정**하고 저장합니다.
-3. 같은 Authentication 화면의 **설정 → 승인된 도메인**에 Netlify 주소(예: `aidam.netlify.app`)를 **도메인 추가**합니다.
-4. 왼쪽 **빌드 → Firestore Database → 데이터베이스 만들기** → 위치 `asia-northeast3 (서울)` → **프로덕션 모드**로 만듭니다.
-5. Firestore의 **규칙** 탭에 저장소의 `firestore.rules` 내용을 그대로 붙여 넣고 **게시**합니다. (각자 자기 기록만 읽고 쓸 수 있게 막는 규칙)
-6. 톱니바퀴 **프로젝트 설정 → 일반 → 내 앱 → 웹(</>)** 으로 앱을 등록하면 `firebaseConfig = { apiKey: ..., authDomain: ..., projectId: ..., appId: ... }` 가 나옵니다. 이 네 값을 Claude에게 보내 주면 `apps/web/src/firebase-config.ts`에 넣어 드립니다. (이 값들은 공개돼도 되는 값이고, 데이터는 5번 규칙으로 보호됩니다)
-
----
+- **처음부터 순서대로 하는 설정 안내: [docs/setup.md](docs/setup.md)**
+- 관리자용 내 컴퓨터 Claude Code 연결: [docs/claude-bridge.md](docs/claude-bridge.md)
 
 ## 개발자용
 
@@ -82,7 +61,8 @@ packages/engine/   순수 TypeScript 성명학 엔진 (DOM 의존 없음, Vitest
   src/score/       100점 채점(자원30·수리25·음령20·음양10·실용15)
   src/recommend/   결정적 이름 추천, 같은 음 더 좋은 한자 제안
   src/siblings/    다둥이 궁합과 세트 추천
-apps/web/          React 18 + Vite 웹앱 (엔진은 Web Worker, 로그인은 Firebase 지연 로드)
+apps/web/          React 18 + Vite 웹앱 (엔진은 Web Worker)
+apps/worker/       서버: Cloudflare Workers + D1 (로그인·잠금·분석 열쇠·결제·저장한 이름)
 tools/build-data/  원천 데이터 → 엔진용 JSON 생성 스크립트
 data-sources/      원천 데이터 사본 (출처·라이선스는 NOTICE.md)
 docs/superpowers/  설계서(spec)와 구현 계획(plan)

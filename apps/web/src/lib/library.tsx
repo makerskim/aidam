@@ -1,13 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { fnv1a } from '@aidam/engine/src/share/hash';
-import { cloudConfigured, fetchEntries, putEntry, removeEntry, signInWithGoogle, signOutCloud, watchUser, type CloudUser, type LibraryEntry } from './cloud';
+import { api, payEnabled, useAccess, type CloudUser, type Provider } from './access';
 import { readStored, writeStored } from './storage';
+
+export interface LibraryEntry {
+  id: string;
+  hangul: string;
+  hanja: string;
+  total: number;
+  grade: string;
+  /** 리포트를 다시 여는 입력 상태 */
+  query: string;
+  savedAt: number;
+  bookmarked: boolean;
+}
 
 interface Library {
   /** 최근 순 */
   entries: LibraryEntry[];
   user: CloudUser | null;
-  /** Firebase 연결 전 임시 미리보기 계정인지 */
+  /** 서버 없이 쓰는 미리보기 계정인지 */
   isPreview: boolean;
   cloudReady: boolean;
   cloudConfigured: boolean;
@@ -18,14 +30,13 @@ interface Library {
   toggleBookmark: (e: Omit<LibraryEntry, 'id' | 'savedAt' | 'bookmarked'>) => void;
   remove: (id: string) => void;
   clearLocal: () => void;
-  signIn: () => Promise<void>;
+  /** 로그인 화면으로 간다. back: 로그인 뒤 돌아올 화면 */
+  signIn: (provider?: Provider, back?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const Ctx = createContext<Library | null>(null);
 const KEY = 'library';
-const PREVIEW_KEY = 'preview-user';
-const PREVIEW_USER: CloudUser = { uid: 'preview', name: '미리보기 계정', email: null, photo: null };
 export const entryId = (query: string) => fnv1a(query);
 
 function loadLocal(): LibraryEntry[] {
@@ -42,93 +53,78 @@ function loadLocal(): LibraryEntry[] {
 const byRecent = (a: LibraryEntry, b: LibraryEntry) => b.savedAt - a.savedAt;
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  const [entries, setEntries] = useState<LibraryEntry[]>(() => loadLocal().sort(byRecent));
-  const [user, setUser] = useState<CloudUser | null>(() => (!cloudConfigured && readStored(PREVIEW_KEY, false) ? PREVIEW_USER : null));
-  const [cloudReady, setCloudReady] = useState(!cloudConfigured);
-  const isPreview = !cloudConfigured && user !== null;
+  const access = useAccess();
+  const user = access.user;
+  const uid = user?.uid ?? null;
+  // 미리보기(서버 없음)에서는 이 기기에, 서버가 있으면 계정 저장소에만 둔다
+  const [entries, setEntries] = useState<LibraryEntry[]>(() => (payEnabled ? [] : loadLocal().sort(byRecent)));
   const [syncError, setSyncError] = useState<string | null>(null);
   const userRef = useRef<CloudUser | null>(user);
+  userRef.current = user;
 
-  // 미리보기 계정의 기록은 기기에, 실제 계정 기록은 계정 저장소에만 둔다
   useEffect(() => {
-    if (!cloudConfigured) writeStored(KEY, entries);
+    if (!payEnabled) writeStored(KEY, entries);
   }, [entries]);
 
-  // 로그인 상태: 첫 화면을 그린 뒤 불러온다
+  // 로그인하면 계정의 기록을 불러온다
   useEffect(() => {
-    if (!cloudConfigured) return;
-    let unsub: (() => void) | undefined;
-    const start = () =>
-      watchUser(async (u) => {
-        userRef.current = u;
-        setUser(u);
-        setCloudReady(true);
-        if (!u) return;
-        try {
-          const remote = await fetchEntries(u.uid);
-          // 기기에만 있던 기록을 계정으로 옮긴다
-          const local = loadLocal();
-          const merged = new Map(remote.map((e) => [e.id, e]));
-          const uploads: Promise<void>[] = [];
-          for (const e of local) {
-            const r = merged.get(e.id);
-            if (!r) {
-              merged.set(e.id, e);
-              uploads.push(putEntry(u.uid, e));
-            } else if (e.bookmarked && !r.bookmarked) {
-              const m = { ...r, bookmarked: true };
-              merged.set(e.id, m);
-              uploads.push(putEntry(u.uid, m));
-            }
-          }
-          setEntries([...merged.values()].sort(byRecent));
-          await Promise.all(uploads);
-          writeStored(KEY, []);
-          writeStored('favorites', []);
-          setSyncError(null);
-        } catch {
-          setSyncError('계정 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-        }
-      }).then((fn) => (unsub = fn));
-    const id = window.setTimeout(start, 300);
+    if (!payEnabled) return;
+    if (!uid) {
+      setEntries([]);
+      return;
+    }
+    let alive = true;
+    api<{ entries: LibraryEntry[] }>('/library')
+      .then((r) => {
+        if (!alive) return;
+        setEntries(r.entries.sort(byRecent));
+        setSyncError(null);
+      })
+      .catch(() => alive && setSyncError('계정 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'));
     return () => {
-      window.clearTimeout(id);
-      unsub?.();
+      alive = false;
     };
+  }, [uid]);
+
+  const save = useCallback((e: LibraryEntry) => {
+    if (payEnabled) api(`/library/${e.id}`, e, 'PUT').catch(() => setSyncError('계정에 저장하지 못했어요.'));
   }, []);
 
-  const upsert = useCallback((next: LibraryEntry) => {
-    setEntries((prev) => [next, ...prev.filter((x) => x.id !== next.id)].sort(byRecent));
-    const u = userRef.current;
-    if (u) putEntry(u.uid, next).catch(() => setSyncError('계정에 저장하지 못했어요. 기기에는 저장됐어요.'));
-  }, []);
+  const upsert = useCallback(
+    (next: LibraryEntry) => {
+      setEntries((prev) => [next, ...prev.filter((x) => x.id !== next.id)].sort(byRecent));
+      save(next);
+    },
+    [save],
+  );
 
   const record = useCallback<Library['record']>(
     (e, bookmark) => {
       // 로그인하지 않으면 저장하지 않는다
       if (!userRef.current) return;
       const id = entryId(e.query);
+      let next: LibraryEntry | null = null;
       setEntries((prev) => {
         const old = prev.find((x) => x.id === id);
-        const next: LibraryEntry = { ...e, id, savedAt: Date.now(), bookmarked: bookmark ?? old?.bookmarked ?? false };
-        const u = userRef.current;
-        if (u) putEntry(u.uid, next).catch(() => setSyncError('계정에 저장하지 못했어요. 기기에는 저장됐어요.'));
+        next = { ...e, id, savedAt: Date.now(), bookmarked: bookmark ?? old?.bookmarked ?? false };
         return [next, ...prev.filter((x) => x.id !== id)].sort(byRecent);
       });
+      // 화면 갱신과 따로, 한 번만 저장한다
+      queueMicrotask(() => next && save(next));
     },
-    [],
+    [save],
   );
 
   const value = useMemo<Library>(
     () => ({
       entries,
       user,
-      cloudReady,
-      cloudConfigured,
+      cloudReady: access.ready,
+      cloudConfigured: payEnabled,
       syncError,
       record,
       isBookmarked: (hanja, query) => entries.some((x) => x.bookmarked && (query ? x.id === entryId(query) : x.hanja === hanja)),
-      isPreview,
+      isPreview: access.isPreview,
       toggleBookmark: (e) => {
         if (!userRef.current) return;
         const id = entryId(e.query);
@@ -137,43 +133,23 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       },
       remove: (id) => {
         setEntries((prev) => prev.filter((x) => x.id !== id));
-        const u = userRef.current;
-        if (u) removeEntry(u.uid, id).catch(() => setSyncError('계정에서 지우지 못했어요.'));
+        if (payEnabled) api(`/library/${id}`, undefined, 'DELETE').catch(() => setSyncError('계정에서 지우지 못했어요.'));
       },
       clearLocal: () => {
         setEntries([]);
         writeStored(KEY, []);
         writeStored('favorites', []);
       },
-      signIn: async () => {
+      signIn: async (provider = 'google', back) => {
         setSyncError(null);
-        if (!cloudConfigured) {
-          writeStored(PREVIEW_KEY, true);
-          userRef.current = PREVIEW_USER;
-          setUser(PREVIEW_USER);
-          return;
-        }
-        try {
-          await signInWithGoogle();
-        } catch (e) {
-          const code = (e as { code?: string; message?: string }).code ?? (e as Error).message;
-          if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-            setSyncError(code === 'CLOUD_NOT_CONFIGURED' ? '로그인 설정이 아직 연결되지 않았어요.' : '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.');
-          }
-        }
+        access.signIn(provider, back);
       },
       signOut: async () => {
-        if (!cloudConfigured) {
-          writeStored(PREVIEW_KEY, false);
-          userRef.current = null;
-          setUser(null);
-          return;
-        }
-        await signOutCloud();
-        setEntries([]);
+        await access.signOut();
+        if (payEnabled) setEntries([]);
       },
     }),
-    [entries, user, isPreview, cloudReady, syncError, record, upsert],
+    [entries, user, access, syncError, record, upsert],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

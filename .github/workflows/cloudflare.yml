@@ -1,11 +1,14 @@
-# Cloudflare 배포: main에 올리면 테스트 → 사이트 빌드 → 서버(결제·AI)와 사이트를 한 번에 배포한다.
+# Cloudflare 배포: main에 올리면 테스트 → 저장소(D1) 준비 → 사이트 빌드 → 서버와 사이트를 한 번에 배포한다.
 # 주소: https://aidam.<내 계정 이름>.workers.dev (Cloudflare 무료 요금제)
 #
-# 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다.
-#   Variables: CLOUDFLARE_ACCOUNT_ID, TOSS_CLIENT_KEY(토스 클라이언트 키, 공개돼도 되는 값)
-#   Secrets:   CLOUDFLARE_API_TOKEN, ADMIN_EMAILS(관리자 이메일), TOSS_SECRET_KEY,
-#              NTFY_TOPIC(관리자 번호를 받을 휴대폰 알림 주제)
-#              선택: SOLAPI_API_KEY·SOLAPI_API_SECRET·SMS_FROM·ADMIN_PHONE(관리자 번호를 문자로), ANTHROPIC_API_KEY
+# 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다(docs/setup.md 참고).
+#   Variables: CLOUDFLARE_ACCOUNT_ID
+#              SITE_MODE        closed(출시 전, 관리자만) 또는 open(모두에게). 없으면 closed
+#              TOSS_CLIENT_KEY  토스 클라이언트 키(결제를 켤 때)
+#   Secrets:   CLOUDFLARE_API_TOKEN, ADMIN_EMAILS, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+#              KAKAO_REST_KEY, NTFY_TOPIC
+#              선택: KAKAO_CLIENT_SECRET, TOSS_SECRET_KEY(결제를 켤 때),
+#                    SOLAPI_API_KEY·SOLAPI_API_SECRET·SMS_FROM·ADMIN_PHONE(관리자 번호를 문자로)
 # CLOUDFLARE_ACCOUNT_ID가 없으면 이 작업은 건너뛴다.
 name: Cloudflare
 
@@ -25,6 +28,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CI: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -35,43 +39,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
-      - name: KV 저장소 준비(없으면 만든다)
+      - name: 저장소(D1) 준비(없으면 만든다)
         working-directory: apps/worker
         run: |
           find_id() {
-            npx wrangler kv namespace list 2>/dev/null | node -e '
+            npx wrangler d1 list --json 2>/dev/null | node -e '
               let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
                 const list = JSON.parse(s.slice(s.indexOf("[")));
-                const hit = list.find((n) => /(^|-)aidam-kv$/.test(n.title));
-                process.stdout.write(hit ? hit.id : "");
+                const hit = list.find((d) => d.name === "aidam");
+                process.stdout.write(hit ? hit.uuid : "");
               });'
           }
           ID=$(find_id)
           if [ -z "$ID" ]; then
-            npx wrangler kv namespace create aidam-kv
+            npx wrangler d1 create aidam
             ID=$(find_id)
           fi
-          if [ -z "$ID" ]; then echo "KV 저장소를 만들지 못했어요"; exit 1; fi
-          sed -i "s/KV_NAMESPACE_ID/$ID/" wrangler.toml
-          echo "KV_ID=$ID" >> "$GITHUB_ENV"
+          if [ -z "$ID" ]; then echo "저장소(D1)를 만들지 못했어요. API 토큰에 D1 편집 권한이 있는지 확인해 주세요."; exit 1; fi
+          sed -i "s/D1_DATABASE_ID/$ID/" wrangler.toml
+          npx wrangler d1 migrations apply aidam --remote
 
-      # 이용권 서명 키: 비밀 키는 서버(KV)에만 두고, 공개 키만 사이트에 넣는다.
-      # 사이트는 서버가 서명한 이용권만 인정하므로, 브라우저에서 서버 답을 바꿔도 잠금이 풀리지 않는다.
-      - name: 이용권 서명 키 준비(없으면 만든다)
+      # 계정 상태 서명 키: 비밀 키는 서버 저장소에만 두고, 공개 키만 사이트에 넣는다.
+      # 사이트는 서버가 서명한 답만 인정하므로, 브라우저에서 서버 답을 바꿔도 잠금이 풀리지 않는다.
+      - name: 서명 키 준비(없으면 만든다)
         working-directory: apps/worker
         run: |
-          public_of() { node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{try{const p=JSON.parse(s).public;process.stdout.write(p&&p.x?JSON.stringify(p):"")}catch{}})'; }
-          PUB=$(npx wrangler kv key get "cfg:signing" --namespace-id "$KV_ID" --remote --text 2>/dev/null | public_of || true)
+          public_of() { node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{try{const rows=JSON.parse(s.slice(s.indexOf("[")));const v=rows[0].results[0].value;const p=JSON.parse(v).public;process.stdout.write(p&&p.x?JSON.stringify(p):"")}catch{}})'; }
+          read_pub() { npx wrangler d1 execute aidam --remote --json --command "SELECT value FROM config WHERE key = 'signing'" 2>/dev/null | public_of || true; }
+          PUB=$(read_pub)
           if [ -z "$PUB" ]; then
-            node ../../tools/gen-signing-key.mjs > "$RUNNER_TEMP/signing.json"
-            npx wrangler kv key put "cfg:signing" --path "$RUNNER_TEMP/signing.json" --namespace-id "$KV_ID" --remote
-            PUB=$(public_of < "$RUNNER_TEMP/signing.json")
-            rm -f "$RUNNER_TEMP/signing.json"
+            printf "INSERT OR IGNORE INTO config (key, value) VALUES ('signing', '%s');\n" "$(node ../../tools/gen-signing-key.mjs)" > "$RUNNER_TEMP/signing.sql"
+            npx wrangler d1 execute aidam --remote --file "$RUNNER_TEMP/signing.sql" > /dev/null
+            rm -f "$RUNNER_TEMP/signing.sql"
+            PUB=$(read_pub)
           fi
           if [ -z "$PUB" ]; then echo "서명 키를 준비하지 못했어요"; exit 1; fi
           echo "VITE_ENTITLE_PUB=$PUB" >> "$GITHUB_ENV"
 
-      - name: 사이트 빌드(결제 켜기)
+      - name: 사이트 빌드
         run: pnpm build
         env:
           VITE_API_BASE: /api
@@ -80,21 +85,24 @@ jobs:
 
       - name: 배포
         working-directory: apps/worker
-        run: npx wrangler deploy
+        run: npx wrangler deploy --var "SITE_MODE:${{ vars.SITE_MODE || 'closed' }}"
 
       - name: 비밀값 올리기(넣어 둔 것만)
         working-directory: apps/worker
         env:
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
-          TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
           SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
           SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
           SMS_FROM: ${{ secrets.SMS_FROM }}
           ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          for NAME in ADMIN_EMAILS TOSS_SECRET_KEY NTFY_TOPIC SOLAPI_API_KEY SOLAPI_API_SECRET SMS_FROM ADMIN_PHONE ANTHROPIC_API_KEY; do
+          for NAME in ADMIN_EMAILS GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET KAKAO_REST_KEY KAKAO_CLIENT_SECRET NTFY_TOPIC TOSS_SECRET_KEY SOLAPI_API_KEY SOLAPI_API_SECRET SMS_FROM ADMIN_PHONE; do
             VALUE="${!NAME}"
             if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | npx wrangler secret put "$NAME"; fi
           done

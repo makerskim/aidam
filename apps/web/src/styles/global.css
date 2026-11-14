@@ -3610,3 +3610,11 @@ img {
   gap: 12px;
   border: 1.5px dashed var(--line);
 }
+.kakao-btn {
+  background: #fee500;
+  color: #191919;
+  border: 1.5px solid #fee500;
+}
+.kakao-btn:hover:not([disabled]) {
+  background: #f5dc00;
+}

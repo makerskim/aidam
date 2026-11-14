@@ -39,13 +39,13 @@ export function LoginCard() {
     <div className="card stack" style={{ gap: 12 }}>
       <b>로그인하면 어느 기기에서든 이어 볼 수 있어요</b>
       <p className="small" style={{ color: 'var(--text-2)' }}>
-        풀어 본 이름과 입력한 생년월일이 내 Google 계정의 저장소에 저장돼요. 이름함에서 언제든 지울 수 있어요.
+        풀어 본 이름과 입력한 생년월일이 내 계정에 저장돼요. 이름함에서 언제든 지울 수 있어요.
       </p>
       <button type="button" className="btn btn-secondary btn-block" onClick={() => void lib.signIn()} style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}>
         {Icon.google}
         Google로 계속하기
       </button>
-      {!lib.cloudConfigured ? <p className="tiny muted">로그인 기능은 관리자 설정 후 켜져요. 지금은 이 기기에만 저장돼요.</p> : null}
+      {!lib.cloudConfigured ? <p className="tiny muted">미리보기에서는 이 기기에만 저장돼요.</p> : null}
     </div>
   );
 }

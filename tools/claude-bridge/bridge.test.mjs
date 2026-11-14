@@ -16,6 +16,10 @@ function fakeSite(calls) {
     if (url === `${SITE}/`) return new Response('<html>아이담</html>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
     if (url === `${SITE}/assets/app.js`) return new Response('js', { headers: { 'content-type': 'text/javascript', 'cache-control': 'max-age=600' } });
     if (url === `${SITE}/api/me`) return new Response('{"admin":true}', { headers: { 'content-type': 'application/json' } });
+    if (url === `${SITE}/api/auth/handoff/redeem`) {
+      const good = init.body.toString().includes('good-code');
+      return new Response(good ? '{"ok":true}' : '{"error":"BAD_CODE"}', { status: good ? 200 : 400, headers: good ? { 'content-type': 'application/json', 'set-cookie': 'aidam_s=newtoken; Path=/; Max-Age=100; HttpOnly; SameSite=Lax; Secure' } : { 'content-type': 'application/json' } });
+    }
     return new Response('없음', { status: 404, headers: { 'content-type': 'text/plain' } });
   };
 }
@@ -51,21 +55,39 @@ test('아이담 사이트를 같은 주소에서 그대로 보여 준다', async
     assert.equal(js.headers.get('cache-control'), 'max-age=600');
     assert.equal((await fetch(`${base}/nope.png`)).status, 404);
     // 사이트 파일은 GET만
-    assert.equal((await fetch(`${base}/assets/app.js`, { method: 'POST', body: 'x' })).status, 405);
+    assert.equal((await fetch(`${base}/assets/app.js`, { method: 'POST', body: 'x', headers: { Origin: base } })).status, 405);
     assert.deepEqual(calls.map((c) => c.url), [`${SITE}/`, `${SITE}/assets/app.js`, `${SITE}/nope.png`]);
   });
 });
 
-test('서버(/api) 요청은 로그인 토큰과 함께 사이트로 넘긴다', async () => {
+test('서버(/api) 요청은 로그인 쿠키와 함께 사이트로 넘기고, 다른 사이트에서 온 바꾸는 요청은 넘기지 않는다', async () => {
   await withBridge({}, async ({ base, calls }) => {
-    const r = await fetch(`${base}/api/me`, { headers: { Authorization: 'Bearer tok' } });
+    const r = await fetch(`${base}/api/me`, { headers: { Cookie: 'aidam_s=tok' } });
     assert.deepEqual(await r.json(), { admin: true });
     assert.equal(r.headers.get('cache-control'), 'no-store');
-    await fetch(`${base}/api/pay/order`, { method: 'POST', headers: { Authorization: 'Bearer tok', 'Content-Type': 'application/json' }, body: '{}' });
-    assert.equal(calls[0].headers.authorization, 'Bearer tok');
+    await fetch(`${base}/api/pay/order`, { method: 'POST', headers: { Cookie: 'aidam_s=tok', 'Content-Type': 'application/json', Origin: base }, body: '{}' });
+    assert.equal(calls[0].headers.cookie, 'aidam_s=tok');
     assert.equal(calls[1].method, 'POST');
     assert.equal(calls[1].body, '{}');
     assert.equal(calls[1].headers.origin, 'https://site.example', '사이트 주소를 출처로 보내지 않음');
+    const evil = await fetch(`${base}/api/pay/order`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' });
+    assert.equal(evil.status, 403);
+    assert.equal(calls.length, 2, '다른 사이트의 요청이 사이트로 넘어감');
+  });
+});
+
+test('사이트에서 넘겨받은 일회용 값으로 로그인 상태를 받아 이 화면에 둔다', async () => {
+  await withBridge({}, async ({ base, calls }) => {
+    const ok = await fetch(`${base}/__bridge/login?code=good-code`, { redirect: 'manual' });
+    assert.equal(ok.status, 302);
+    assert.equal(ok.headers.get('location'), '/');
+    assert.equal(ok.headers.get('set-cookie'), 'aidam_s=newtoken; Path=/; Max-Age=100; HttpOnly; SameSite=Lax', 'Secure를 떼지 않음');
+    assert.equal(calls[0].url, `${SITE}/api/auth/handoff/redeem`);
+    assert.equal(calls[0].body, '{"code":"good-code"}');
+    assert.equal(calls[0].headers.origin, 'https://site.example');
+    const bad = await fetch(`${base}/__bridge/login?code=bad`, { redirect: 'manual' });
+    assert.equal(bad.status, 400);
+    assert.equal(bad.headers.get('set-cookie'), null);
   });
 });
 

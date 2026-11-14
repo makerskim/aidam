@@ -2,7 +2,7 @@
 /**
  * 아이담 ↔ 내 Claude Code 연결 프로그램 (개인용)
  *
- * 이 프로그램을 켜면 내 컴퓨터에서 아이담이 열리고(http://localhost:8765),
+ * 이 프로그램을 켜고 사이트의 "내 컴퓨터 화면 열기"를 누르면 내 컴퓨터에서 아이담이 열리고(http://localhost:8765),
  * 그 화면의 AI 풀이를 내 컴퓨터에 로그인된 공식 Claude Code(구독 로그인)가 써 준다.
  * - 내 컴퓨터 안에서만 듣는다(localhost). 바깥에서는 닿지 않는다.
  * - Claude 계정 정보나 토큰을 읽거나 내보내지 않는다. 설치된 `claude` 명령을 그대로 실행할 뿐이다.
@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const VERSION = '2';
+export const VERSION = '3';
 export const APP = 'aidam-claude-bridge';
 const DEFAULT_PORT = 8765;
 const MAX_PROMPT = 20_000;
@@ -62,6 +62,12 @@ export function runClaude(prompt, { bin = 'claude', cwd, timeoutMs = TIMEOUT_MS,
     });
     child.stdin.end(prompt);
   });
+}
+
+/** 사이트가 준 쿠키를 내 컴퓨터(http://localhost)에서도 쓸 수 있게 바꾼다 */
+function localCookies(up) {
+  const list = typeof up.headers.getSetCookie === 'function' ? up.headers.getSetCookie() : [];
+  return list.map((c) => c.replace(/;\s*Secure/gi, ''));
 }
 
 async function readBody(req, limit) {
@@ -121,24 +127,43 @@ export function createHandler({ site, run = runClaude, fetchImpl = fetch }) {
           busy = false;
         }
       }
+      // 사이트에서 '내 컴퓨터 화면 열기'를 누르면 일회용 값과 함께 여기로 온다. 그 값으로 로그인 상태를 받아 이 화면에 둔다
+      if (path === '/__bridge/login' && req.method === 'GET') {
+        const code = new URL(req.url ?? '/', 'http://x').searchParams.get('code') ?? '';
+        const up = await fetchImpl(`${site}/api/auth/handoff/redeem`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: siteOrigin },
+          body: JSON.stringify({ code }),
+        });
+        if (!up.ok) return send(400, '<meta charset="utf-8"><p>연결 값이 맞지 않거나 시간이 지났어요. 사이트의 "내 Claude Code 연결"에서 "내 컴퓨터 화면 열기"를 다시 눌러 주세요.</p>', 'text/html; charset=utf-8');
+        res.writeHead(302, { Location: '/', 'Cache-Control': 'no-store', 'Set-Cookie': localCookies(up) });
+        return res.end();
+      }
       if (path.startsWith('/__bridge/')) return send(404, { error: 'NOT_FOUND', message: '없는 주소예요.' });
 
-      // 아이담 사이트를 그대로 가져온다. 사이트 파일은 GET만, 서버(/api)는 로그인 토큰과 함께 그대로 넘긴다
-      const isApi = path.startsWith('/api/');
-      if (!isApi && req.method !== 'GET' && req.method !== 'HEAD') return send(405, { error: 'METHOD', message: '지원하지 않는 요청이에요.' });
-      const headers = {};
-      for (const h of ['authorization', 'content-type', 'accept']) if (req.headers[h]) headers[h] = req.headers[h];
+      // 아이담 사이트를 그대로 가져온다. 로그인 쿠키는 그대로 넘기고 돌려받는다
       const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+      const isApi = path.startsWith('/api/');
+      if (hasBody && !isApi) return send(405, { error: 'METHOD', message: '지원하지 않는 요청이에요.' });
+      // 바꾸는 요청은 이 프로그램이 연 화면에서 온 것만 넘긴다(다른 사이트가 내 로그인으로 요청하지 못하게)
+      if (hasBody && req.headers.origin !== `http://${host}`) return send(403, { error: 'BAD_ORIGIN', message: '이 화면에서만 쓸 수 있어요.' });
+      const headers = {};
+      for (const h of ['content-type', 'accept', 'cookie']) if (req.headers[h]) headers[h] = req.headers[h];
       if (hasBody) headers.origin = siteOrigin;
       const up = await fetchImpl(site + (req.url ?? '/'), {
         method: req.method,
         headers,
         body: hasBody ? await readBody(req, 100_000) : undefined,
-        redirect: 'follow',
+        redirect: 'manual',
       });
       const out = { 'Content-Type': up.headers.get('content-type') ?? 'application/octet-stream' };
       // 사이트 파일은 이름에 버전이 들어 있어 오래 두어도 되지만, 첫 화면과 서버 응답은 늘 새로 받는다
       out['Cache-Control'] = isApi || path === '/' || path.endsWith('.html') || path.endsWith('sw.js') ? 'no-store' : (up.headers.get('cache-control') ?? 'no-cache');
+      const cookies = localCookies(up);
+      if (cookies.length) out['Set-Cookie'] = cookies;
+      const loc = up.headers.get('location');
+      // 사이트 안에서의 이동(로그아웃 뒤 첫 화면 등)만 따라간다
+      if (loc && up.status >= 300 && up.status < 400) out.Location = loc.startsWith('/') ? loc : '/';
       res.writeHead(up.status, out);
       res.end(req.method === 'HEAD' ? undefined : Buffer.from(await up.arrayBuffer()));
     } catch (e) {
@@ -175,9 +200,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // localhost가 IPv6(::1)로 풀리는 컴퓨터에서도 열리게 한다(안 되면 무시)
     createServer(handler).on('error', () => undefined).listen(port, '::1');
     console.log('아이담 ↔ 내 Claude Code 연결이 켜졌어요.');
-    console.log(`  여기서 쓰세요: ${url}  (브라우저가 자동으로 열려요)`);
+    console.log(`  내 컴퓨터 화면: ${url}`);
+    console.log('  브라우저가 열리면, 사이트의 "내 Claude Code 연결"에서 "내 컴퓨터 화면 열기"를 누르세요.');
     console.log(`  아이담 사이트: ${site}`);
     console.log('이 창을 켜 둔 동안만 동작해요. 끄려면 Ctrl+C 를 누르세요.');
-    if (!process.env.NO_OPEN) openBrowser(url);
+    if (process.env.NO_OPEN) return;
+    // 로그인이 있는 사이트면 사이트의 연결 화면을 열어 '내 컴퓨터 화면 열기'를 누르게 하고, 아니면 바로 이 화면을 연다
+    fetch(`${site}/api/me`)
+      .then((r) => r.json())
+      .then((d) => openBrowser(d && d.login ? `${site}/#/connect` : url))
+      .catch(() => openBrowser(url));
   });
 }
