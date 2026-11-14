@@ -2,6 +2,7 @@
 // 빌드본 스모크 테스트. 사용법: pnpm -C apps/web build && pnpm -C apps/web preview & node apps/web/e2e/smoke.mjs
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -365,39 +366,38 @@ assert.ok(await page.locator('.ai-card input[aria-label="AI에게 함께 물어�
 assert.equal(await page.locator('.ai-card button:has-text("AI 풀이 받기")').count(), 0, 'API 방식 버튼이 보임');
 console.log('✓ AI 풀이: API 없이 내 Claude 계정으로(무료)');
 
-// 내 컴퓨터의 Claude Code 연결(개인용): 연결 번호 확인 → 이 화면에서 바로 풀이
+// 내 컴퓨터의 Claude Code 연결(개인용): 일반 화면에는 보이지 않고, 연결 프로그램으로 열면 번호 없이 바로 풀이
+assert.equal(await page.locator('.ai-card >> text=Claude Code').count(), 0, '일반 화면에 Claude Code 연결이 보임');
 {
+  await page.goto(`${BASE}/#/connect`);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("연결 프로그램 내려받기")')]);
+  const file = readFileSync(await dl.path(), 'utf8');
+  assert.ok(file.includes(`const BAKED_SITE = '${BASE}'`), '내려받은 프로그램에 사이트 주소가 없음');
   const sent = [];
-  await page.route('http://127.0.0.1:8765/**', async (route) => {
+  await page.route('**/__bridge/**', async (route) => {
     const req = route.request();
-    const ok = req.headers().authorization === 'Bearer good-number';
-    const json = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(body) });
-    if (!ok) return json(401, { error: 'BAD_TOKEN', message: '연결 번호가 맞지 않아요.' });
-    if (req.url().endsWith('/health')) return json(200, { ok: true });
+    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (req.url().endsWith('/health')) return json({ ok: true, app: 'aidam-claude-bridge', version: '2' });
     sent.push(JSON.parse(req.postData() ?? '{}').prompt);
-    return json(200, { text: '## 이름에 담긴 뜻\n내 Claude Code가 쓴 풀이예요.' });
+    return json({ text: '## 이름에 담긴 뜻\n내 Claude Code가 쓴 풀이예요.' });
   });
-  await page.click('text=내 컴퓨터의 Claude Code 연결 (개인용)');
-  assert.ok(await page.locator('a[href$="aidam-claude-bridge.mjs"]').count(), '연결 프로그램 내려받기 없음');
-  await page.fill('input[aria-label="연결 번호"]', 'wrong');
-  await page.click('.ai-link button[type=submit]');
-  await page.waitForSelector('text=연결 번호가 맞지 않아요');
-  await page.fill('input[aria-label="연결 번호"]', 'good-number');
-  await page.click('.ai-link button[type=submit]');
+  await page.goto(reportUrl);
+  await page.reload();
   await page.waitForSelector('text=내 Claude Code 연결됨');
+  assert.equal(await page.locator('.ai-card button:has-text("내 Claude 계정으로")').count(), 0, '연결됐는데 복사 방식이 보임');
   await page.fill('.ai-card input[aria-label="AI에게 함께 물어볼 질문"]', '부르기 쉬운가요?');
   await page.click('.ai-card button:has-text("내 Claude Code로 풀이 받기")');
   await page.waitForSelector('.ai-text h3');
   assert.ok((await page.locator('.ai-text').innerText()).includes('내 Claude Code가 쓴 풀이'));
   assert.ok(sent[0].includes('부르기 쉬운가요?') && sent[0].includes('"한글"'), '요청 글에 질문·이름 정보');
   assert.ok(!sent[0].includes('2026'), '요청 글에 생년월일이 들어감');
-  await page.click('text=내 Claude Code 연결 끊기');
-  assert.ok(await page.locator('.ai-card button:has-text("내 Claude 계정으로 풀이 받기")').count(), '연결을 끊어도 복사 방식이 돌아오지 않음');
+  await page.goto(`${BASE}/#/connect`);
+  await page.waitForSelector('text=연결되어 있어요');
+  await page.unroute('**/__bridge/**');
 }
-console.log('✓ 내 컴퓨터의 Claude Code 연결: 번호 확인 → 화면에서 바로 풀이 → 끊기');
+console.log('✓ 내 컴퓨터의 Claude Code 연결: 일반 화면엔 없음 · 내려받기 · 번호 없이 바로 풀이');
 
 await browser.close();
-// 틀린 연결 번호를 일부러 넣어 본 401은 뺀다
-const real = errors.filter((e) => !e.includes('React Router Future Flag') && !e.includes('401 (Unauthorized)'));
+const real = errors.filter((e) => !e.includes('React Router Future Flag'));
 assert.deepEqual(real, [], `콘솔 오류: ${real.join(' | ')}`);
 console.log('✓ 콘솔 오류 없음');

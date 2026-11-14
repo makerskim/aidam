@@ -1,5 +1,5 @@
 // 아이담 오프라인 캐시: 같은 출처의 GET 요청만 캐시한다. 외부 요청은 하지 않는다.
-const CACHE = 'aidam-v3';
+const CACHE = 'aidam-v4';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -10,8 +10,8 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
-  // 서버(결제·AI) 응답과 결제 후 돌아오는 주소는 캐시하지 않는다
-  if (url.pathname.startsWith('/api/') || url.search.includes('pay=')) return;
+  // 서버(결제·AI)·내 컴퓨터 연결 응답과 결제 후 돌아오는 주소는 캐시하지 않는다
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/__bridge/') || url.pathname.endsWith('aidam-claude-bridge.mjs') || url.search.includes('pay=')) return;
   const isPage = req.mode === 'navigate';
   event.respondWith(
     (isPage

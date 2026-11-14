@@ -3,7 +3,8 @@
 #
 # 처음 한 번만 GitHub 저장소 Settings → Secrets and variables → Actions 에서 넣는다.
 #   Variables: CLOUDFLARE_ACCOUNT_ID, TOSS_CLIENT_KEY(토스 클라이언트 키, 공개돼도 되는 값)
-#   Secrets:   CLOUDFLARE_API_TOKEN, TOSS_SECRET_KEY (ANTHROPIC_API_KEY는 선택: 없으면 AI는 API 없이 무료 방식만)
+#   Secrets:   CLOUDFLARE_API_TOKEN, ADMIN_EMAILS(관리자 이메일), TOSS_SECRET_KEY
+#              (ANTHROPIC_API_KEY는 선택: 없으면 AI는 API 없이 무료 방식만)
 # CLOUDFLARE_ACCOUNT_ID가 없으면 이 작업은 건너뛴다.
 name: Cloudflare
 
@@ -32,12 +33,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
-      - name: 사이트 빌드(결제·AI 켜기)
-        run: pnpm build
-        env:
-          VITE_API_BASE: /api
-          VITE_TOSS_CLIENT_KEY: ${{ vars.TOSS_CLIENT_KEY }}
-      - run: pnpm budget
 
       - name: KV 저장소 준비(없으면 만든다)
         working-directory: apps/worker
@@ -57,6 +52,30 @@ jobs:
           fi
           if [ -z "$ID" ]; then echo "KV 저장소를 만들지 못했어요"; exit 1; fi
           sed -i "s/KV_NAMESPACE_ID/$ID/" wrangler.toml
+          echo "KV_ID=$ID" >> "$GITHUB_ENV"
+
+      # 이용권 서명 키: 비밀 키는 서버(KV)에만 두고, 공개 키만 사이트에 넣는다.
+      # 사이트는 서버가 서명한 이용권만 인정하므로, 브라우저에서 서버 답을 바꿔도 잠금이 풀리지 않는다.
+      - name: 이용권 서명 키 준비(없으면 만든다)
+        working-directory: apps/worker
+        run: |
+          public_of() { node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{try{const p=JSON.parse(s).public;process.stdout.write(p&&p.x?JSON.stringify(p):"")}catch{}})'; }
+          PUB=$(npx wrangler kv key get "cfg:signing" --namespace-id "$KV_ID" --remote --text 2>/dev/null | public_of || true)
+          if [ -z "$PUB" ]; then
+            node ../../tools/gen-signing-key.mjs > "$RUNNER_TEMP/signing.json"
+            npx wrangler kv key put "cfg:signing" --path "$RUNNER_TEMP/signing.json" --namespace-id "$KV_ID" --remote
+            PUB=$(public_of < "$RUNNER_TEMP/signing.json")
+            rm -f "$RUNNER_TEMP/signing.json"
+          fi
+          if [ -z "$PUB" ]; then echo "서명 키를 준비하지 못했어요"; exit 1; fi
+          echo "VITE_ENTITLE_PUB=$PUB" >> "$GITHUB_ENV"
+
+      - name: 사이트 빌드(결제 켜기)
+        run: pnpm build
+        env:
+          VITE_API_BASE: /api
+          VITE_TOSS_CLIENT_KEY: ${{ vars.TOSS_CLIENT_KEY }}
+      - run: pnpm budget
 
       - name: 배포
         working-directory: apps/worker
@@ -65,10 +84,11 @@ jobs:
       - name: 비밀값 올리기(넣어 둔 것만)
         working-directory: apps/worker
         env:
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
           TOSS_SECRET_KEY: ${{ secrets.TOSS_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          for NAME in TOSS_SECRET_KEY ANTHROPIC_API_KEY; do
+          for NAME in ADMIN_EMAILS TOSS_SECRET_KEY ANTHROPIC_API_KEY; do
             VALUE="${!NAME}"
             if [ -n "$VALUE" ]; then printf '%s' "$VALUE" | npx wrangler secret put "$NAME"; fi
           done

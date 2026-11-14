@@ -2,7 +2,8 @@
  * 토스페이먼츠 결제.
  * 1) /api/pay/order: 서버가 주문번호와 금액을 정해 저장한다(금액을 브라우저가 정하지 못하게).
  * 2) 브라우저가 토스 결제창을 띄우고, 성공하면 paymentKey·orderId·amount를 받는다.
- * 3) /api/pay/confirm: 저장한 주문과 금액이 맞는지 보고, 토스에 승인 요청을 보낸 뒤 이용권을 늘린다.
+ * 3) /api/pay/confirm: 저장한 주문과 금액이 맞는지 보고, 토스에 승인 요청을 보낸 뒤 이용권(1회 = 정해진 시간)을 연다.
+ * 카카오페이·네이버페이 같은 간편결제는 토스 결제창 안에서 고른다(토스 계약에 포함된 경우).
  */
 import type { AuthUser } from './auth';
 import { plan, type Env } from './env';
@@ -16,13 +17,13 @@ export interface Entitlement {
 interface Order {
   uid: string;
   amount: number;
-  days: number;
+  hours: number;
   orderName: string;
   createdAt: number;
   status: 'ready' | 'done';
 }
 
-const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const TOSS_CONFIRM = 'https://api.tosspayments.com/v1/payments/confirm';
 
 export async function getEntitlement(env: Env, uid: string): Promise<Entitlement | null> {
@@ -48,9 +49,9 @@ export async function customerKey(uid: string): Promise<string> {
 export async function createOrder(env: Env, user: AuthUser) {
   const p = plan(env);
   const orderId = `aidam_${Date.now().toString(36)}_${randomId()}`;
-  const order: Order = { uid: user.uid, amount: p.amount, days: p.days, orderName: p.orderName, createdAt: Date.now(), status: 'ready' };
+  const order: Order = { uid: user.uid, amount: p.amount, hours: p.hours, orderName: p.orderName, createdAt: Date.now(), status: 'ready' };
   await env.KV.put(`order:${orderId}`, JSON.stringify(order), { expirationTtl: 60 * 60 * 24 });
-  return { orderId, amount: p.amount, orderName: p.orderName, days: p.days, customerKey: await customerKey(user.uid) };
+  return { orderId, amount: p.amount, orderName: p.orderName, hours: p.hours, customerKey: await customerKey(user.uid) };
 }
 
 export class PayError extends Error {
@@ -111,7 +112,7 @@ export async function confirmPayment(
   const now = Date.now();
   const prev = await getEntitlement(env, user.uid);
   const base = prev && prev.until > now ? prev.until : now;
-  const ent: Entitlement = { until: base + order.days * DAY, orders: [...(prev?.orders ?? []), orderId].slice(-50) };
+  const ent: Entitlement = { until: base + order.hours * HOUR, orders: [...(prev?.orders ?? []), orderId].slice(-50) };
   await env.KV.put(`ent:${user.uid}`, JSON.stringify(ent));
   await env.KV.put(key, JSON.stringify({ ...order, status: 'done' }), { expirationTtl: 60 * 60 * 24 * 7 });
   // 정산·환불 확인용 기록

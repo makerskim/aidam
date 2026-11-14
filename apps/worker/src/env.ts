@@ -6,12 +6,12 @@ export interface Env {
   ASSETS: Fetcher;
   /** Firebase 프로젝트 ID — 로그인 토큰 확인에 쓴다 */
   FIREBASE_PROJECT_ID: string;
-  /** 결제 없이 쓰는 관리자 이메일(쉼표로 여러 개) */
-  ADMIN_EMAILS: string;
+  /** 비밀값: 결제 없이 쓰는 관리자 이메일(쉼표로 여러 개) */
+  ADMIN_EMAILS?: string;
   /** 이용권 가격(원) */
   PRICE_KRW: string;
-  /** 이용권 기간(일) */
-  PASS_DAYS: string;
+  /** 이용권 1회로 쓸 수 있는 시간 */
+  PASS_HOURS: string;
   /** 결제창에 보이는 상품 이름 */
   ORDER_NAME: string;
   /** 한 사람이 하루에 받을 수 있는 AI 풀이 수 */
@@ -35,9 +35,9 @@ export const num = (v: string | undefined, d: number): number => {
 
 export function plan(env: Env) {
   return {
-    amount: Math.round(num(env.PRICE_KRW, 9900)),
-    days: Math.round(num(env.PASS_DAYS, 30)),
-    orderName: env.ORDER_NAME || '아이담 이용권',
+    amount: Math.round(num(env.PRICE_KRW, 990)),
+    hours: Math.round(num(env.PASS_HOURS, 24)),
+    orderName: env.ORDER_NAME || '아이담 1회 이용권',
   };
 }
 

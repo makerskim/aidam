@@ -5,6 +5,7 @@ import worker from '../src/index';
 import { setKeySource } from '../src/auth';
 import { setClientFactory, SYSTEM_PROMPT } from '../src/ai';
 import type { Env } from '../src/env';
+import { accessMessage, resetSigningKey } from '../src/sign';
 
 const PROJECT = 'aidam-test';
 let priv: CryptoKey;
@@ -37,9 +38,9 @@ function makeEnv(over: Partial<Env> = {}): Env {
     ASSETS: { fetch: async () => new Response('site') } as unknown as Fetcher,
     FIREBASE_PROJECT_ID: PROJECT,
     ADMIN_EMAILS: 'boss@example.com',
-    PRICE_KRW: '9900',
-    PASS_DAYS: '30',
-    ORDER_NAME: '아이담 30일 이용권',
+    PRICE_KRW: '990',
+    PASS_HOURS: '24',
+    ORDER_NAME: '아이담 1회 이용권',
     AI_DAILY_LIMIT: '2',
     AI_ADMIN_DAILY_LIMIT: '100',
     AI_GLOBAL_DAILY_LIMIT: '200',
@@ -109,7 +110,7 @@ describe('로그인 확인', () => {
   it('설정은 로그인 없이 볼 수 있다', async () => {
     const r = await call(makeEnv(), '/api/config');
     expect(r.status).toBe(200);
-    expect(r.data.plan).toEqual({ amount: 9900, days: 30, orderName: '아이담 30일 이용권' });
+    expect(r.data.plan).toEqual({ amount: 990, hours: 24, orderName: '아이담 1회 이용권' });
   });
 });
 
@@ -128,24 +129,25 @@ describe('관리자', () => {
 });
 
 describe('결제', () => {
-  it('주문 → 승인하면 이용권이 30일 생긴다', async () => {
+  it('주문 → 승인하면 1회 이용권(24시간)이 생긴다', async () => {
     const env = makeEnv();
     const tok = await token('u1', 'u1@example.com');
     const order = await call(env, '/api/pay/order', { tok, body: {} });
     expect(order.status).toBe(200);
-    expect(order.data.amount).toBe(9900);
+    expect(order.data.amount).toBe(990);
     expect(order.data.customerKey).not.toContain('u1');
     const calls = stubToss(tossOk);
-    const ok = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 9900 } });
+    const ok = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 990 } });
     expect(ok.status).toBe(200);
     expect(calls).toHaveLength(1);
-    const days = (ok.data.until - Date.now()) / 86_400_000;
-    expect(days).toBeGreaterThan(29.9);
+    const hours = (ok.data.until - Date.now()) / 3_600_000;
+    expect(hours).toBeGreaterThan(23.9);
+    expect(hours).toBeLessThanOrEqual(24);
     const me = await call(env, '/api/me', { tok });
     expect(me.data.paid).toBe(true);
     expect(me.data.unlocked).toBe(true);
     // 같은 주문을 다시 보내도 두 번 승인하지 않는다
-    const again = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 9900 } });
+    const again = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 990 } });
     expect(again.status).toBe(200);
     expect(calls).toHaveLength(1);
     expect(again.data.until).toBe(ok.data.until);
@@ -168,7 +170,7 @@ describe('결제', () => {
     stubToss(tossOk);
     const r = await call(env, '/api/pay/confirm', {
       tok: await token('u2', 'u2@example.com'),
-      body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 9900 },
+      body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 990 },
     });
     expect(r.status).toBe(403);
   });
@@ -178,7 +180,7 @@ describe('결제', () => {
     const tok = await token('u1', 'u1@example.com');
     const order = await call(env, '/api/pay/order', { tok, body: {} });
     stubToss(() => ({ status: 400, json: { code: 'REJECT_CARD_COMPANY', message: '카드사에서 거절했어요.' } }));
-    const r = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 9900 } });
+    const r = await call(env, '/api/pay/confirm', { tok, body: { paymentKey: 'pk', orderId: order.data.orderId, amount: 990 } });
     expect(r.status).toBe(402);
     expect(r.data.error).toBe('REJECT_CARD_COMPANY');
     expect((await call(env, '/api/me', { tok })).data.paid).toBe(false);
@@ -194,6 +196,32 @@ describe('결제', () => {
     const env = makeEnv({ TOSS_SECRET_KEY: undefined });
     const r = await call(env, '/api/pay/order', { tok: await token('u1', 'u1@example.com'), body: {} });
     expect(r.status).toBe(503);
+  });
+});
+
+describe('이용권 서명', () => {
+  it('키가 없으면 서명 없이 답한다', async () => {
+    resetSigningKey();
+    const r = await call(makeEnv(), '/api/me', { tok: await token('u1', 'u1@example.com') });
+    expect(r.data.sig).toBeNull();
+    expect(r.data.uid).toBe('u1');
+  });
+
+  it('공개 키로 확인되는 서명을 붙이고, 내용을 바꾸면 확인되지 않는다', async () => {
+    resetSigningKey();
+    const kp = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])) as CryptoKeyPair;
+    const env = makeEnv();
+    await env.KV.put('cfg:signing', JSON.stringify({ private: await crypto.subtle.exportKey('jwk', kp.privateKey), public: await crypto.subtle.exportKey('jwk', kp.publicKey) }));
+    const r = await call(env, '/api/me', { tok: await token('admin1', 'boss@example.com') });
+    const d = r.data;
+    expect(typeof d.sig).toBe('string');
+    const sig = Uint8Array.from(atob(d.sig.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const check = (m: string) => crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, kp.publicKey, sig, new TextEncoder().encode(m));
+    expect(await check(accessMessage({ uid: d.uid, admin: d.admin, until: d.until, iat: d.iat }))).toBe(true);
+    // 다른 사람 것으로 바꾸거나 관리자·기간을 고치면 서명이 맞지 않는다
+    expect(await check(accessMessage({ uid: 'someone-else', admin: true, until: d.until, iat: d.iat }))).toBe(false);
+    expect(await check(accessMessage({ uid: d.uid, admin: d.admin, until: Date.now() + 9e9, iat: d.iat }))).toBe(false);
+    resetSigningKey();
   });
 });
 

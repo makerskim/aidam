@@ -21,7 +21,7 @@ await page.route('**/api/**', async (route) => {
   const url = new URL(route.request().url());
   const auth = route.request().headers().authorization;
   const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-  if (url.pathname === '/api/config') return json(200, { plan: { amount: 9900, days: 30, orderName: '아이담 30일 이용권' }, payReady: true, aiReady: true });
+  if (url.pathname === '/api/config') return json(200, { plan: { amount: 990, hours: 24, orderName: '아이담 1회 이용권' }, payReady: true, aiReady: true });
   if (!auth || !me) return json(401, { error: 'UNAUTHORIZED', message: '로그인이 필요해요.' });
   if (url.pathname === '/api/me') return json(200, me);
   if (url.pathname === '/api/ai/explain') {
@@ -53,7 +53,7 @@ await page.click('button:has-text("이름 추천받기")');
 await page.waitForSelector('.name-card', { timeout: 40000 });
 await page.waitForSelector('.paywall');
 assert.equal(await page.locator('section[aria-label="추천 이름"] .name-card').count(), 3, '맛보기는 3개');
-assert.ok(await page.locator('.paywall:has-text("9,900원")').count(), '가격 표시');
+assert.ok(await page.locator('.paywall:has-text("1회 이용권 990원")').count(), '가격 표시');
 assert.equal(await page.locator('button:has-text("이름 더 보기")').count(), 0, '더 보기가 보임');
 console.log('✓ 로그인 전: 추천 3개 + 이용권 안내');
 
@@ -74,7 +74,7 @@ assert.ok(await page.locator('button:has-text("로그인하고 결제하기")').
 console.log('✓ 결제 화면(가격·환불 안내)');
 
 // 4) 관리자로 로그인하면 전부 열림
-me = { admin: true, paid: false, until: null, unlocked: true, ai: { left: 100, limit: 100 }, plan: { amount: 9900, days: 30, orderName: '아이담 30일 이용권' } };
+me = { admin: true, paid: false, until: null, unlocked: true, ai: { left: 100, limit: 100 }, plan: { amount: 990, hours: 24, orderName: '아이담 1회 이용권' } };
 await page.goto(resultsUrl);
 await page.click('.site-header button:has-text("로그인")');
 await page.click('.modal .google-btn');

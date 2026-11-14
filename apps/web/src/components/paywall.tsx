@@ -44,7 +44,7 @@ export function Paywall({ title, lines, hidden }: { title: string; lines?: strin
       ) : (
         <div className="pw-actions">
           <button type="button" className="btn btn-primary btn-lg" onClick={goPay}>
-            {plan ? `${plan.days}일 이용권 ${won(plan.amount)}` : '이용권 보기'}
+            {plan ? `1회 이용권 ${won(plan.amount)}` : '이용권 보기'}
           </button>
           {!lib.user ? (
             <button type="button" className="text-btn" onClick={gate.openLogin}>

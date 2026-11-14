@@ -1,45 +1,33 @@
 /**
  * 내 컴퓨터의 Claude Code 연결(개인용).
- * 내 컴퓨터에서 켜 둔 연결 프로그램(aidam-claude-bridge.mjs)에 풀이 요청 글을 보내면,
- * 거기 로그인된 공식 Claude Code가 구독 요금제로 글을 써서 돌려준다. 서버나 API 키를 거치지 않는다.
+ * 연결 프로그램(aidam-claude-bridge.mjs)을 켜면 내 컴퓨터(localhost)에서 아이담이 열린다.
+ * 그 화면에서는 같은 주소의 /__bridge/explain 으로 풀이 요청 글을 보내고,
+ * 내 컴퓨터에 로그인된 공식 Claude Code가 구독 요금제로 글을 써서 돌려준다.
+ * 일반 사이트 주소에서는 이 기능이 전혀 보이지 않는다.
  */
-export const BRIDGE_URL = 'http://127.0.0.1:8765';
-const KEY = 'aidam:bridge-token';
+const APP = 'aidam-claude-bridge';
+const isLocal = typeof window !== 'undefined' && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
-export function readBridgeToken(): string {
-  try {
-    return localStorage.getItem(KEY) ?? '';
-  } catch {
-    return '';
-  }
+let probe: Promise<boolean> | null = null;
+
+/** 이 화면이 연결 프로그램을 통해 열렸는지 */
+export function bridgeAvailable(): Promise<boolean> {
+  if (!isLocal) return Promise.resolve(false);
+  probe ??= fetch('/__bridge/health', { cache: 'no-store' })
+    .then((r) => (r.ok ? (r.json() as Promise<{ app?: string }>) : null))
+    .then((d) => d?.app === APP)
+    .catch(() => false);
+  return probe;
 }
 
-export function saveBridgeToken(token: string) {
-  try {
-    if (token) localStorage.setItem(KEY, token);
-    else localStorage.removeItem(KEY);
-  } catch {
-    /* 저장이 막힌 환경 */
-  }
-}
-
-const OFF = '연결 프로그램에 닿지 않아요. 내 컴퓨터에서 켜져 있는지 확인해 주세요.';
-
-async function call<T>(token: string, path: string, body?: unknown): Promise<T> {
+export async function bridgeExplain(prompt: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(BRIDGE_URL + path, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    res = await fetch('/__bridge/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
   } catch {
-    throw new Error(OFF);
+    throw new Error('연결 프로그램이 꺼졌어요. 터미널에서 다시 켜 주세요.');
   }
-  const data = (await res.json().catch(() => ({}))) as { message?: string };
-  if (!res.ok) throw new Error(data.message ?? OFF);
-  return data as T;
+  const data = (await res.json().catch(() => ({}))) as { text?: string; message?: string };
+  if (!res.ok || !data.text) throw new Error(data.message ?? 'Claude Code에서 풀이를 받지 못했어요.');
+  return data.text;
 }
-
-export const bridgeCheck = (token: string) => call<{ ok: boolean }>(token, '/health');
-export const bridgeExplain = (token: string, prompt: string) => call<{ text: string }>(token, '/explain', { prompt }).then((r) => r.text);

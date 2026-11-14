@@ -11,6 +11,7 @@ import { AiError, aiUsage, explain } from './ai';
 import { AuthError, verifyUser, type AuthUser } from './auth';
 import { isAdminEmail, plan, type Env } from './env';
 import { confirmPayment, createOrder, getEntitlement, isActive, PayError } from './pay';
+import { signAccess } from './sign';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -59,7 +60,9 @@ export async function handleApi(req: Request, env: Env, path: string): Promise<R
   if (path === '/api/me' && req.method === 'GET') {
     const a = await access(env, user);
     const ai = await aiUsage(env, user.uid, a.admin);
-    return json({ ...a, unlocked: a.admin || a.paid, ai, plan: plan(env) });
+    const iat = Date.now();
+    const sig = await signAccess(env, { uid: user.uid, admin: a.admin, until: a.until, iat });
+    return json({ ...a, uid: user.uid, iat, sig, unlocked: a.admin || a.paid, ai, plan: plan(env) });
   }
 
   if (path === '/api/pay/order' && req.method === 'POST') {

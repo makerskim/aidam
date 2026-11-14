@@ -6,3 +6,4 @@ coverage/
 dist-preview/
 dist-pay/
 .wrangler/
+dist-sign/

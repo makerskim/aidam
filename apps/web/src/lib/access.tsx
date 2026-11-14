@@ -15,7 +15,8 @@ export const FREE_NAMES = 3;
 
 export interface Plan {
   amount: number;
-  days: number;
+  /** 1회 이용권으로 쓸 수 있는 시간 */
+  hours: number;
   orderName: string;
 }
 
@@ -69,12 +70,42 @@ export async function api<T>(path: string, body?: unknown, token?: string | null
 }
 
 interface Me {
+  uid?: string;
+  iat?: number;
+  /** 서버 서명(위조 방지) */
+  sig?: string | null;
   admin: boolean;
   paid: boolean;
   until: number | null;
   unlocked: boolean;
   ai: { left: number; limit: number };
   plan: Plan;
+}
+
+/** 서버 서명을 확인할 공개 키(빌드할 때 넣는다). 없으면 확인을 건너뛴다(미리보기·시험용) */
+const PUB_JWK = (import.meta.env.VITE_ENTITLE_PUB as string | undefined) ?? '';
+let pubKey: Promise<CryptoKey> | null = null;
+
+/**
+ * 서버가 서명한 이용권인지 확인하고, 확인된 값만 돌려준다.
+ * 브라우저에서 서버 답을 가짜로 바꿔도 서명이 맞지 않아 잠금이 풀리지 않는다.
+ */
+async function verified(me: Me, uid: string): Promise<Me> {
+  if (!PUB_JWK) return me;
+  const locked: Me = { ...me, admin: false, paid: false, until: null, unlocked: false };
+  try {
+    if (!me.sig || !me.iat || me.uid !== uid) return locked;
+    pubKey ??= crypto.subtle.importKey('jwk', JSON.parse(PUB_JWK) as JsonWebKey, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    const sig = Uint8Array.from(atob(me.sig.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const msg = `aidam-access|${me.uid}|${me.admin ? 1 : 0}|${me.until ?? 0}|${me.iat}`;
+    const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, await pubKey, sig, new TextEncoder().encode(msg));
+    if (!ok) return locked;
+    // 서명된 값(관리자 여부·기간)만으로 다시 판단한다
+    const paid = me.until !== null && me.until > Date.now();
+    return { ...me, paid, unlocked: me.admin || paid };
+  } catch {
+    return locked;
+  }
 }
 
 export function AccessProvider({ children }: { children: ReactNode }) {
@@ -104,7 +135,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     try {
       // 미리보기 계정(로그인 설정 없는 빌드)은 시험용 토큰을 쓴다
       const tok = lib.isPreview ? 'preview-token' : await getIdToken();
-      setMe(await api<Me>('/me', undefined, tok));
+      setMe(await verified(await api<Me>('/me', undefined, tok), uid));
     } catch (e) {
       setMe(null);
       setError(e instanceof Error ? e.message : '이용권을 확인하지 못했어요.');
@@ -150,4 +181,9 @@ export const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 export const dateKo = (ms: number) => {
   const d = new Date(ms);
   return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
+};
+/** 이용권 끝나는 때(날짜와 시각) */
+export const timeKo = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 || 12}시 ${String(d.getMinutes()).padStart(2, '0')}분`;
 };

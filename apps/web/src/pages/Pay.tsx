@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, ApiError, dateKo, useAccess, won } from '../lib/access';
+import { api, ApiError, timeKo, useAccess, won } from '../lib/access';
 import { useLibrary } from '../lib/library';
 import { useGate } from '../lib/gate';
 import { RETURN_KEY } from '../components/paywall';
@@ -62,14 +62,14 @@ export function PayPage() {
     <main className="container narrow page stack-lg">
       <div className="stack" style={{ gap: 8 }}>
         <span className="section-kicker">이용권</span>
-        <h1>아이담 이용권</h1>
-        <p style={{ color: 'var(--text-2)' }}>이름을 고르는 동안 마음껏 보고 비교하세요.</p>
+        <h1>아이담 1회 이용권</h1>
+        <p style={{ color: 'var(--text-2)' }}>한 번 결제로 {plan?.hours ?? 24}시간 동안 모든 이름과 풀이를 볼 수 있어요.</p>
       </div>
 
       {access.admin ? <p className="note-soft">관리자 계정이라 결제 없이 모두 쓸 수 있어요.</p> : null}
       {access.paid && access.until ? (
         <p className="note-soft">
-          이용권이 <b>{dateKo(access.until)}</b>까지 있어요. 지금 결제하면 그 뒤로 {plan?.days ?? 30}일이 늘어나요.
+          이용권을 <b>{timeKo(access.until)}</b>까지 쓸 수 있어요. 지금 결제하면 그 뒤로 {plan?.hours ?? 24}시간이 늘어나요.
         </p>
       ) : null}
 
@@ -86,7 +86,8 @@ export function PayPage() {
               ? `AI가 써 주는 이 이름만의 풀이와 질문 답변(하루 ${access.ai?.limit ?? 20}번)`
               : 'AI 풀이 요청 글 만들기: 내 Claude 계정에 붙여 넣으면 이 이름만의 풀이를 받아요'}
           </li>
-          <li>{plan?.days ?? 30}일 동안 이용, 자동으로 다시 결제되지 않아요</li>
+          <li>결제 후 {plan?.hours ?? 24}시간 동안 이용, 자동으로 다시 결제되지 않아요</li>
+          <li>카드, 카카오페이·네이버페이·토스페이 같은 간편결제(결제창에서 선택)</li>
         </ul>
         {ready ? (
           <button type="button" className="btn btn-primary btn-lg btn-block" disabled={busy} onClick={() => void pay()}>
@@ -100,7 +101,7 @@ export function PayPage() {
 
       <section className="stack small" style={{ gap: 6, color: 'var(--text-2)' }} aria-label="환불 안내">
         <h2 className="h3">환불 안내</h2>
-        <p>결제 후 7일 안에 AI 풀이를 한 번도 받지 않았다면 전액 환불해 드려요. 그 밖의 경우 남은 기간만큼 나누어 돌려드려요.</p>
+        <p>결제한 뒤 잠긴 내용(추천 이름 전체, 자세한 풀이)을 열어 보지 않았다면 전액 환불해 드려요. 열어 본 뒤에는 디지털 콘텐츠 특성상 환불이 어려워요.</p>
         <p>환불은 {BUSINESS.email ? <a href={`mailto:${BUSINESS.email}`}>{BUSINESS.email}</a> : '고객 문의'}로 결제한 Google 계정과 함께 알려 주세요.</p>
         <p>
           성명학 풀이는 전통 해석에 따른 참고 정보예요. AI 풀이는 Claude(Anthropic)가 사이트의 계산 결과를 글로 풀어 쓴 것이고, 생년월일 원문은 보내지 않아요.
@@ -157,7 +158,7 @@ export function PayDone() {
       {state.kind === 'ok' ? (
         <>
           <h1>결제가 끝났어요</h1>
-          <p style={{ color: 'var(--text-2)' }}>{state.until ? `${dateKo(state.until)}까지 모든 이름과 풀이를 볼 수 있어요.` : ''}</p>
+          <p style={{ color: 'var(--text-2)' }}>{state.until ? `${timeKo(state.until)}까지 모든 이름과 풀이를 볼 수 있어요.` : ''}</p>
           <button type="button" className="btn btn-primary btn-lg" onClick={() => navigate(returnPath(), { replace: true })}>
             보던 화면으로
           </button>

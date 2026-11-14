@@ -10,8 +10,9 @@ import { SettingsPage } from './pages/Settings';
 import { SajuPage } from './pages/Saju';
 import { LibraryProvider, useLibrary } from './lib/library';
 import { GateProvider, useGate } from './lib/gate';
-import { AccessProvider, dateKo, useAccess } from './lib/access';
+import { AccessProvider, timeKo, useAccess } from './lib/access';
 import { PayDone, PayPage } from './pages/Pay';
+import { ConnectPage } from './pages/Connect';
 import { BUSINESS } from './business';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -91,7 +92,7 @@ function AccountMenu() {
           </div>
           {access.enabled ? (
             <button type="button" role="menuitem" onClick={() => go('/pay')}>
-              {access.admin ? '이용권 (관리자 무료)' : access.paid && access.until ? `이용권 · ${dateKo(access.until)}까지` : '이용권'}
+              {access.admin ? '이용권 (관리자 무료)' : access.paid && access.until ? `이용권 · ${timeKo(access.until)}까지` : '이용권'}
             </button>
           ) : null}
           <button type="button" role="menuitem" onClick={() => go('/me?tab=saved')}>
@@ -100,6 +101,11 @@ function AccountMenu() {
           <button type="button" role="menuitem" onClick={() => go('/me?tab=history')}>
             검색 기록
           </button>
+          {access.admin ? (
+            <button type="button" role="menuitem" onClick={() => go('/connect')}>
+              내 Claude Code 연결
+            </button>
+          ) : null}
           <button type="button" role="menuitem" onClick={() => go('/settings')}>
             설정
           </button>
@@ -235,6 +241,7 @@ function Shell() {
           <Route path="/settings" element={<RequireUser><SettingsPage /></RequireUser>} />
           <Route path="/pay" element={<PayPage />} />
           <Route path="/pay/done" element={<PayDone />} />
+          <Route path="/connect" element={<ConnectPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </ErrorBoundary>

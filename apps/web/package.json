@@ -11,7 +11,8 @@
     "e2e": "node e2e/smoke.mjs",
     "build:preview": "tsc --noEmit && VITE_DISABLE_CLOUD=1 vite build --outDir dist-preview",
     "e2e:paywall": "node e2e/paywall.mjs",
-    "build:paywall": "tsc --noEmit && VITE_DISABLE_CLOUD=1 VITE_API_BASE=/api vite build --outDir dist-pay"
+    "build:paywall": "tsc --noEmit && VITE_DISABLE_CLOUD=1 VITE_API_BASE=/api vite build --outDir dist-pay",
+    "e2e:sign": "node e2e/sign.mjs"
   },
   "dependencies": {
     "@aidam/engine": "workspace:*",

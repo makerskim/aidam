@@ -1,70 +1,116 @@
-// 연결 프로그램 테스트: node --test tools/claude-bridge
+// 연결 프로그램 테스트: node --test tools/claude-bridge/bridge.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer, request } from 'node:http';
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createBridge, originAllowed, runClaude } from '../../apps/web/public/aidam-claude-bridge.mjs';
+import { APP, createHandler, runClaude } from '../../apps/web/public/aidam-claude-bridge.mjs';
 
-const SITE = 'https://makerskim.github.io';
-const TOKEN = 'test-token-1234567890';
+const SITE = 'https://site.example/aidam';
 
-async function withBridge(run, fn) {
-  const server = createBridge({ token: TOKEN, run });
+/** 가짜 아이담 사이트 */
+function fakeSite(calls) {
+  return async (url, init) => {
+    calls.push({ url, method: init.method, headers: init.headers, body: init.body ? init.body.toString() : null });
+    if (url === `${SITE}/`) return new Response('<html>아이담</html>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (url === `${SITE}/assets/app.js`) return new Response('js', { headers: { 'content-type': 'text/javascript', 'cache-control': 'max-age=600' } });
+    if (url === `${SITE}/api/me`) return new Response('{"admin":true}', { headers: { 'content-type': 'application/json' } });
+    return new Response('없음', { status: 404, headers: { 'content-type': 'text/plain' } });
+  };
+}
+
+async function withBridge(opts, fn) {
+  const calls = [];
+  const server = createServer(createHandler({ site: SITE, fetchImpl: fakeSite(calls), ...opts }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const port = server.address().port;
   try {
-    await fn(base);
+    await fn({ base: `http://127.0.0.1:${port}`, port, calls });
   } finally {
     await new Promise((r) => server.close(r));
   }
 }
 
-const post = (base, body, headers = {}) =>
-  fetch(`${base}/explain`, { method: 'POST', headers: { Origin: SITE, Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+const explain = (base, body, headers = {}) =>
+  fetch(`${base}/__bridge/explain`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
-test('아이담 주소만 받는다', () => {
-  assert.ok(originAllowed(SITE));
-  assert.ok(originAllowed('https://aidam.makerskim.workers.dev'));
-  assert.ok(!originAllowed('https://evil.example'));
-  assert.ok(!originAllowed('https://aidam.evil.example'));
-  assert.ok(!originAllowed(''));
+/** Host 머리말을 바꿔 보낸다(fetch로는 못 바꾼다) */
+const rawGet = (port, host, path = '/__bridge/health') =>
+  new Promise((resolve, reject) => {
+    request({ host: '127.0.0.1', port, path, headers: { Host: host } }, (res) => resolve(res.statusCode)).on('error', reject).end();
+  });
+
+test('아이담 사이트를 같은 주소에서 그대로 보여 준다', async () => {
+  await withBridge({}, async ({ base, calls }) => {
+    const page = await fetch(`${base}/`);
+    assert.equal(await page.text(), '<html>아이담</html>');
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    const js = await fetch(`${base}/assets/app.js`);
+    assert.equal(js.headers.get('content-type'), 'text/javascript');
+    assert.equal(js.headers.get('cache-control'), 'max-age=600');
+    assert.equal((await fetch(`${base}/nope.png`)).status, 404);
+    // 사이트 파일은 GET만
+    assert.equal((await fetch(`${base}/assets/app.js`, { method: 'POST', body: 'x' })).status, 405);
+    assert.deepEqual(calls.map((c) => c.url), [`${SITE}/`, `${SITE}/assets/app.js`, `${SITE}/nope.png`]);
+  });
 });
 
-test('다른 사이트·틀린 연결 번호는 거절하고 Claude를 부르지 않는다', async () => {
-  let calls = 0;
-  await withBridge(async () => (calls++, 'x'), async (base) => {
-    assert.equal((await post(base, { prompt: 'hi' }, { Origin: 'https://evil.example' })).status, 403);
-    assert.equal((await post(base, { prompt: 'hi' }, { Authorization: 'Bearer wrong' })).status, 401);
-    assert.equal((await post(base, { prompt: 'hi' }, { Authorization: '' })).status, 401);
-    assert.equal((await post(base, { prompt: '' })).status, 400);
-    assert.equal((await post(base, { prompt: 'ㄱ'.repeat(20_001) })).status, 400);
+test('서버(/api) 요청은 로그인 토큰과 함께 사이트로 넘긴다', async () => {
+  await withBridge({}, async ({ base, calls }) => {
+    const r = await fetch(`${base}/api/me`, { headers: { Authorization: 'Bearer tok' } });
+    assert.deepEqual(await r.json(), { admin: true });
+    assert.equal(r.headers.get('cache-control'), 'no-store');
+    await fetch(`${base}/api/pay/order`, { method: 'POST', headers: { Authorization: 'Bearer tok', 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(calls[0].headers.authorization, 'Bearer tok');
+    assert.equal(calls[1].method, 'POST');
+    assert.equal(calls[1].body, '{}');
+    assert.equal(calls[1].headers.origin, 'https://site.example', '사이트 주소를 출처로 보내지 않음');
   });
-  assert.equal(calls, 0);
 });
 
-test('사전 요청(preflight)에 사설 네트워크 허용을 답한다', async () => {
-  await withBridge(async () => 'x', async (base) => {
-    const r = await fetch(`${base}/explain`, { method: 'OPTIONS', headers: { Origin: SITE, 'Access-Control-Request-Method': 'POST' } });
-    assert.equal(r.status, 204);
-    assert.equal(r.headers.get('access-control-allow-origin'), SITE);
-    assert.equal(r.headers.get('access-control-allow-private-network'), 'true');
+test('연결 확인에 답하고, 다른 이름(Host)으로 닿는 요청은 받지 않는다', async () => {
+  await withBridge({}, async ({ base, port }) => {
+    const h = await (await fetch(`${base}/__bridge/health`)).json();
+    assert.equal(h.app, APP);
+    assert.equal(await rawGet(port, `localhost:${port}`), 200);
+    assert.equal(await rawGet(port, `evil.example:${port}`), 403);
+    assert.equal(await rawGet(port, 'evil.example'), 403);
   });
+});
+
+test('다른 사이트에서 온 풀이 요청은 거절하고 Claude를 부르지 않는다', async () => {
+  let n = 0;
+  await withBridge({ run: async () => (n++, 'x') }, async ({ base }) => {
+    assert.equal((await explain(base, { prompt: 'hi' }, { Origin: 'https://evil.example' })).status, 403);
+    assert.equal((await explain(base, { prompt: 'hi' }, { 'Sec-Fetch-Site': 'cross-site' })).status, 403);
+    assert.equal((await fetch(`${base}/__bridge/explain`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'text/plain' }, body: '{"prompt":"hi"}' })).status, 403);
+    assert.equal((await fetch(`${base}/__bridge/explain`)).status, 403);
+    assert.equal((await explain(base, { prompt: '' })).status, 400);
+    assert.equal((await explain(base, { prompt: 'ㄱ'.repeat(20_001) })).status, 400);
+  });
+  assert.equal(n, 0);
 });
 
 test('풀이를 돌려주고, 쓰는 동안 온 요청은 기다리라고 답한다', async () => {
   let release;
   const gate = new Promise((r) => (release = r));
-  await withBridge(async (p) => (await gate, `풀이: ${p}`), async (base) => {
-    const first = post(base, { prompt: '김서윤' });
+  await withBridge({ run: async (p) => (await gate, `풀이: ${p}`) }, async ({ base }) => {
+    const first = explain(base, { prompt: '김서윤' });
     await new Promise((r) => setTimeout(r, 50));
-    assert.equal((await post(base, { prompt: '둘째' })).status, 429);
+    assert.equal((await explain(base, { prompt: '둘째' })).status, 429);
     release();
     const r = await first;
     assert.equal(r.status, 200);
     assert.deepEqual(await r.json(), { text: '풀이: 김서윤' });
-    const h = await fetch(`${base}/health`, { headers: { Origin: SITE, Authorization: `Bearer ${TOKEN}` } });
-    assert.equal((await h.json()).ok, true);
+  });
+});
+
+test('Claude가 실패하면 이유를 알려 준다', async () => {
+  await withBridge({ run: async () => { throw Object.assign(new Error('로그인이 필요해요'), { code: 'CLAUDE_ERROR' }); } }, async ({ base }) => {
+    const r = await explain(base, { prompt: 'x' });
+    assert.equal(r.status, 502);
+    assert.equal((await r.json()).message, '로그인이 필요해요');
   });
 });
 
